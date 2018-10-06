@@ -20,5 +20,10 @@
   "bugs": {
     "url": "https://github.com/jdvalentini/FwCAT/issues"
   },
-  "homepage": "https://github.com/jdvalentini/FwCAT#readme"
+  "homepage": "https://github.com/jdvalentini/FwCAT#readme",
+  "dependencies": {
+    "config": "^2.0.1",
+    "electron-log": "^2.2.17",
+    "event-stream": "^4.0.1"
+  }
 }
