@@ -14,3 +14,7 @@ then install dependencies
 place your config file path into 
 
 ``` index.js const cfgFile = 'path/to/cfg-file' ```
+
+## Collaborators
+
+Esteban Panelli ( https://github.com/estebanpanelli )
