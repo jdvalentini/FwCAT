@@ -10,6 +10,8 @@ const app = express();
 // cfg = parser.parseFirewall('/src/ciscotest.cfg')
 // cfg.then(data =>{console.log(JSON.stringify(data, null, 2))}) //  Write the .catch()
 
+const cfgFile = "./src/cisco-internet.cfg";
+
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
@@ -27,7 +29,7 @@ app.post('/', function(req, res){
     console.log('POST /');
     console.dir(req.body);
     if (req.body.cmd == 'parseTest'){
-        cfg = parser.parseFirewall('/src/cisco-internet.cfg')
+        cfg = parser.parseFirewall(cfgFile)
         cfg.then(config =>{
             res.writeHead(200, {'Content-Type': 'text/json'});
             res.end(JSON.stringify(config, null, 2));
