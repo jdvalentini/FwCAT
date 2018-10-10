@@ -3,11 +3,11 @@ $.ajax({
     type: 'POST',
     data: {cmd:"parseTest"},
     success: function(response){
+        console.log(response.rules.filter)
         for (rule of response.rules.filter){
-            console.log(rule.acl)
             $('#right-pane').append(`
             <div class="row">
-                <div class="col-1 rule ruleNumber">#</div>
+                <div class="col-1 rule ruleNumber">${rule.number}</div>
                 <div class="col-1 rule ruleAction">${rule.action}</div>
                 <div class="col-2 rule ruleAccessList">${rule.acl}</div>
                 <div class="col-1 rule ruleProtocol">${rule.protocol}</div>
@@ -19,6 +19,7 @@ $.ajax({
                 <div class="col-1 rule ruleStatus">${rule.status}</div>
             </div>`)
         }
+        console.log(response.notparsed)
         // console.log(response)
     },
     error: function(xhr,errmsg,err){

@@ -2,8 +2,13 @@ const log = require('electron-log');
 
 module.exports = {
     testModule: testModule,
-    parseFirewall: parseFirewall
+    parseFirewall: parseFirewall,
+    ciscoParseAccessList: ciscoParseAccessList,
+    isIPv4: isIPv4
 }
+
+var accessListCommentBuffer = ''
+var ACEnumber = 0
 
 function testModule(message){
     console.log(message)
@@ -30,7 +35,8 @@ function parseFirewall(configFile){
         rules:{
             nat:[],
             filter:[]
-        }
+        },
+        notparsed:[]
     }
     
     // var s = fs.createReadStream(configFile)
@@ -42,16 +48,22 @@ function parseFirewall(configFile){
             lineNr += 1;
 
             let {h, k, sk, v} = parseLine(fwType, line, parents) // Gets hierarchy, key, subkey and value
-            if (fwType == 'cisco-asa' && h >= 0) {parents[h] = line} // See clearing children on writing parent
+            if (fwType == 'cisco-asa') {
+                if (h >= 0) {
+                    parents[h] = line
+                    if (parents.length > h+1){parents = parents.slice(0,h+1)} // Clean parents from lower hierarchies
+                }
 
-            if (k == 'rules') {
-                if (sk == 'filter' && v !== 'remark'){cfg[k][sk].push(v)}
+                if (k == 'rules') {
+                    if (sk == 'filter' && v !== 'remark'){cfg[k][sk].push(Object.assign({lineNumber:lineNr},v))}
+                }
+                else if (k == 'interfaces') {
+                    if (sk == 'id') {var obj = {}; obj[sk] = v; cfg[k].push(obj)}
+                    else {cfg[k][cfg[k].length-1][sk] = v}  // Update the last "interface" array element
+                }
+                else if (k == 'host') {cfg[k][sk] = v}
+                else {cfg.notparsed.push(line)}
             }
-            else if (k == 'interfaces') {
-                if (sk == 'id') {var obj = {}; obj[sk] = v; cfg[k].push(obj)}
-                else {cfg[k][cfg[k].length-1][sk] = v}  // Update the last "interface" array element
-            }
-            else if (k == 'host') {cfg[k][sk] = v}
 
             s.resume();
             })
@@ -61,6 +73,8 @@ function parseFirewall(configFile){
             })
             .on('end', function(){
                 console.log('Read entire file: ' + lineNr + ' lines.')
+                accessListCommentBuffer = ''
+                ACEnumber = 0
                 resolve(cfg)
             })
         );
@@ -72,13 +86,12 @@ function ciscoParseAccessListAddresses(argList){ // Receives the splitted access
     if (/any|any4|any6/.test(argList[0])) {data.address = argList[0]; data.shift = 1}
     else if (/interface/.test(argList[0])) {data.interface = argList.slice(0,2).join(' '); data.shift = 2}
     else if (/object|object-group/.test(argList[0])) {data.address = argList.slice(0,2).join(' '); data.shift = 2}
-    else if (/host/.test(argList[0])) {data.address = argList.slice(0,2).join(' '); data.shift = 2}
+    else if (/host/.test(argList[0])) {data.address = argList[1]; data.shift = 2}
     else if (isIPv4(argList[0])) {data.address = argList[0]+'/'+mask2cidr(argList[1]); data.shift = 2}
     else if (isIPv6(argList[0])) {data.address = argList[0]; data.shift = 1}
     return data
 }
 
-var accessListCommentBuffer = ''
 
 function ciscoParseAccessList(ln){
     // From Cisco Conf
@@ -93,47 +106,63 @@ function ciscoParseAccessList(ln){
         return 'remark'
     }
     else {
+        // ACE order numer
+        ACEnumber += 1
+        ace.number = ACEnumber
         // Clear comment buffer
         ace.comment = accessListCommentBuffer
         accessListCommentBuffer = ''
         // Check the type of rule
-        if (ace.action == undefined && expanded[0] == 'extended') {ace.action=expanded[1]; expanded = expanded.slice(2)}
-        // Check the protocol
-        if (ace.protocol == undefined){ 
-            if (/object|object-group/.test(expanded[0])){ace.protocol = expanded.slice(0,2).join(' '); expanded.shift(); expanded.shift()}
-            else {ace.protocol = expanded[0]; expanded.shift()}
-        }
-        // Check the source address
-        source = ciscoParseAccessListAddresses(expanded)
-        if (source.address !== undefined) {ace.srcAddress = source.address}
-        else if (source.interface !== undefined) {ace.srcInterface = source.interface}
-        expanded = expanded.slice(source.shift)
-
-        // Check the source port
-            // To detect the object-groups I will need to have them parsed first (should be an object-group service)
-        if (ace.protocol !== 'ip'){
-            testaddress = (/any[46]?|interface|object|object-group|host/.test(expanded[2]) || isIPv4(expanded[2]) || isIPv6(expanded[2]))
-            if (/lt|gt|eq|neq/.test(expanded[0])){ace.srcPort = expanded.slice(0,2).join(' '); expanded = expanded.slice(2)}
-            else if (/range/.test(expanded[0])) {ace.srcPort = expanded.slice(0,3).join(' '); expanded = expanded.slice(3)}
-            else if (/object-group/.test(expanded[0]) && expanded.length > 2 && !testaddress) {
-                ace.srcPort = expanded.slice(0,2).join(' ');
-                expanded = expanded.slice(2)
+        if (expanded[0] == 'extended') {
+            ace.type = 'extended'
+            ace.action=expanded[1]; expanded = expanded.slice(2)
+            // Check the protocol
+            if (ace.protocol == undefined){ 
+                if (/object|object-group/.test(expanded[0])){ace.protocol = expanded.slice(0,2).join(' '); expanded.shift(); expanded.shift()}
+                else {ace.protocol = expanded[0]; expanded.shift()}
             }
+
+            // Check the source address
+            source = ciscoParseAccessListAddresses(expanded)
+            if (source.address !== undefined) {ace.srcAddress = source.address}
+            else if (source.interface !== undefined) {ace.srcInterface = source.interface}
+            expanded = expanded.slice(source.shift)
+
+            // Check the source port
+                // To detect the object-groups I will need to have them parsed first (should be an object-group service)
+            if (ace.protocol !== 'ip'){
+                testaddress = (/any[46]?|interface|object|object-group|host/.test(expanded[2]) || isIPv4(expanded[2]) || isIPv6(expanded[2]))
+                if (/lt|gt|eq|neq/.test(expanded[0])){ace.srcPort = expanded.slice(0,2).join(' '); expanded = expanded.slice(2)}
+                else if (/range/.test(expanded[0])) {ace.srcPort = expanded.slice(0,3).join(' '); expanded = expanded.slice(3)}
+                else if (/object-group/.test(expanded[0]) && expanded.length > 2 && !testaddress) {
+                    ace.srcPort = expanded.slice(0,2).join(' ');
+                    expanded = expanded.slice(2)
+                }
+            }
+
+            // Check the destination address
+            destination = ciscoParseAccessListAddresses(expanded)
+            if (destination.address !== undefined) {ace.dstAddress = destination.address}
+            else if (destination.interface !== undefined) {ace.dstInterface = destination.interface}
+            expanded = expanded.slice(destination.shift)
+
+            // Check the destination port
+                // To detect the object-groups I will need to have them parsed first (should be an object-group service)
+            if (/lt|gt|eq|neq/.test(expanded[0])){ace.dstPort = expanded.slice(0,2).join(' '); expanded = expanded.slice(2)}
+            else if (/range/.test(expanded[0])) {ace.dstPort = expanded.slice(0,3).join(' '); expanded = expanded.slice(3)}
+            else if (/object-group/.test(expanded[0])) {ace.dstPort = expanded.slice(0,2).join(' '); expanded = expanded.slice(2)}
+
+            if (expanded.length > 0) {ace.options = expanded.join(' ')}}
+        else if (expanded[0] == 'standard') {
+            ace.type = 'standard'
+            ace.action=expanded[1]; expanded = expanded.slice(2)
+            ace.protocol = 'ip'
+            // In 'standard' rules only destination address is possible
+            destination = ciscoParseAccessListAddresses(expanded)
+            if (destination.address !== undefined) {ace.dstAddress = destination.address}
+            else if (destination.interface !== undefined) {ace.dstInterface = destination.interface}
+            expanded = expanded.slice(destination.shift)
         }
-
-        // Check the destination address
-        destination = ciscoParseAccessListAddresses(expanded)
-        if (destination.address !== undefined) {ace.dstAddress = destination.address}
-        else if (destination.interface !== undefined) {ace.dstInterface = destination.interface}
-        expanded = expanded.slice(destination.shift)
-
-        // Check the destination port
-            // To detect the object-groups I will need to have them parsed first (should be an object-group service)
-        if (/lt|gt|eq|neq/.test(expanded[0])){ace.dstPort = expanded.slice(0,2).join(' '); expanded = expanded.slice(2)}
-        else if (/range/.test(expanded[0])) {ace.dstPort = expanded.slice(0,3).join(' '); expanded = expanded.slice(3)}
-        else if (/object-group/.test(expanded[0])) {ace.dstPort = expanded.slice(0,2).join(' '); expanded = expanded.slice(2)}
-
-        if (expanded.length > 0) {ace.options = expanded.join(' ')}
     }
     return ace
 }
