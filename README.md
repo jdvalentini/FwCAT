@@ -15,6 +15,8 @@ place your config file path into
 
 ``` index.js const cfgFile = 'path/to/cfg-file' ```
 
+then run with ``` npm start ```
+
 ## Collaborators
 
 Esteban Panelli ( https://github.com/estebanpanelli )
