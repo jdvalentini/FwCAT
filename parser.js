@@ -1,3 +1,5 @@
+const log = require('electron-log');
+
 module.exports = {
     testModule: testModule,
     parseFirewall: parseFirewall
@@ -40,13 +42,16 @@ function parseFirewall(configFile){
             lineNr += 1;
 
             let {h, k, sk, v} = parseLine(fwType, line, parents) // Gets hierarchy, key, subkey and value
-            if (fwType == 'cisco-asa' && h >= 0) {parents[h] = line} // Se clearing children on writing parent
+            if (fwType == 'cisco-asa' && h >= 0) {parents[h] = line} // See clearing children on writing parent
 
-            if (k == 'host') {cfg[k][sk] = v}
-            if (k == 'interfaces') {
+            if (k == 'rules') {
+                if (sk == 'filter' && v !== 'remark'){cfg[k][sk].push(v)}
+            }
+            else if (k == 'interfaces') {
                 if (sk == 'id') {var obj = {}; obj[sk] = v; cfg[k].push(obj)}
                 else {cfg[k][cfg[k].length-1][sk] = v}  // Update the last "interface" array element
             }
+            else if (k == 'host') {cfg[k][sk] = v}
 
             s.resume();
             })
@@ -62,9 +67,81 @@ function parseFirewall(configFile){
     })
 }
 
+function ciscoParseAccessListAddresses(argList){ // Receives the splitted access-list config line from the address definition
+    data = {shift:0}
+    if (/any|any4|any6/.test(argList[0])) {data.address = argList[0]; data.shift = 1}
+    else if (/interface/.test(argList[0])) {data.interface = argList.slice(0,2).join(' '); data.shift = 2}
+    else if (/object|object-group/.test(argList[0])) {data.address = argList.slice(0,2).join(' '); data.shift = 2}
+    else if (/host/.test(argList[0])) {data.address = argList.slice(0,2).join(' '); data.shift = 2}
+    else if (isIPv4(argList[0])) {data.address = argList[0]+'/'+mask2cidr(argList[1]); data.shift = 2}
+    else if (isIPv6(argList[0])) {data.address = argList[0]; data.shift = 1}
+    return data
+}
+
+var accessListCommentBuffer = ''
+
+function ciscoParseAccessList(ln){
+    // From Cisco Conf
+        // access-list access_list_name [line line_number] extended {deny | permit} protocol_argument source_address_argument...
+        // dest_address_argument [log [[level] [interval secs] | disable | default]] [time-range time_range_name] [inactive]
+    var expanded = ln.trim().split(' ').slice(2)
+    var ace = {acl:ln.split(' ')[1], line:ln}
+
+    if (expanded[0] == 'remark') {
+        ace.comment = expanded.slice(1).join(' ')
+        accessListCommentBuffer = expanded.slice(1).join(' ')
+        return 'remark'
+    }
+    else {
+        // Clear comment buffer
+        ace.comment = accessListCommentBuffer
+        accessListCommentBuffer = ''
+        // Check the type of rule
+        if (ace.action == undefined && expanded[0] == 'extended') {ace.action=expanded[1]; expanded = expanded.slice(2)}
+        // Check the protocol
+        if (ace.protocol == undefined){ 
+            if (/object|object-group/.test(expanded[0])){ace.protocol = expanded.slice(0,2).join(' '); expanded.shift(); expanded.shift()}
+            else {ace.protocol = expanded[0]; expanded.shift()}
+        }
+        // Check the source address
+        source = ciscoParseAccessListAddresses(expanded)
+        if (source.address !== undefined) {ace.srcAddress = source.address}
+        else if (source.interface !== undefined) {ace.srcInterface = source.interface}
+        expanded = expanded.slice(source.shift)
+
+        // Check the source port
+            // To detect the object-groups I will need to have them parsed first (should be an object-group service)
+        if (ace.protocol !== 'ip'){
+            testaddress = (/any[46]?|interface|object|object-group|host/.test(expanded[2]) || isIPv4(expanded[2]) || isIPv6(expanded[2]))
+            if (/lt|gt|eq|neq/.test(expanded[0])){ace.srcPort = expanded.slice(0,2).join(' '); expanded = expanded.slice(2)}
+            else if (/range/.test(expanded[0])) {ace.srcPort = expanded.slice(0,3).join(' '); expanded = expanded.slice(3)}
+            else if (/object-group/.test(expanded[0]) && expanded.length > 2 && !testaddress) {
+                ace.srcPort = expanded.slice(0,2).join(' ');
+                expanded = expanded.slice(2)
+            }
+        }
+
+        // Check the destination address
+        destination = ciscoParseAccessListAddresses(expanded)
+        if (destination.address !== undefined) {ace.dstAddress = destination.address}
+        else if (destination.interface !== undefined) {ace.dstInterface = destination.interface}
+        expanded = expanded.slice(destination.shift)
+
+        // Check the destination port
+            // To detect the object-groups I will need to have them parsed first (should be an object-group service)
+        if (/lt|gt|eq|neq/.test(expanded[0])){ace.dstPort = expanded.slice(0,2).join(' '); expanded = expanded.slice(2)}
+        else if (/range/.test(expanded[0])) {ace.dstPort = expanded.slice(0,3).join(' '); expanded = expanded.slice(3)}
+        else if (/object-group/.test(expanded[0])) {ace.dstPort = expanded.slice(0,2).join(' '); expanded = expanded.slice(2)}
+
+        if (expanded.length > 0) {ace.options = expanded.join(' ')}
+    }
+    return ace
+}
+
 function parseLine(type, line, parents){
     if (type == 'cisco-asa'){
-        // h = line.search(/\S|$/) // Counts whitespaces to detect the hierarchy
+        // returns {h:hierarcy, k:key, sk:subkey, v:value}
+        // var h = line.search(/\S|$/) // Counts whitespaces to detect the hierarchy (No error if blank)
         var h = line.search(/\S/) // Counts whitespaces to detect the hierarchy
 
         if (line.search('hostname ') == 0) {return {h:h, k:'host', sk:'hostname', v:line.split(' ')[1]}}
@@ -72,11 +149,13 @@ function parseLine(type, line, parents){
 
         if (line.search('interface ') == 0) {return {h:h, k:'interfaces', sk:'id', v:line.split(' ')[1]}}
 
+        if (line.search('access-list ') == 0) {return {h:h, k:'rules', sk:'filter', v:ciscoParseAccessList(line)}}
+
         if (h>0) { // Line is a child inside a block
             l = line.trim()
             if (l.search('no ') == 0) {return {h:h, k:null, sk:null, v:null}} // See how to handle no...
 
-            var p = parseLine(type, parents[h-1], parents)
+            var p = parseLine(type, parents[h-1], parents)  // Recursively parse the parent line
 
             if (p.k == 'interfaces') {
                 if (l.search('ip ') == 0) {
@@ -94,7 +173,7 @@ function parseLine(type, line, parents){
 function mask2cidr(mask){
     var cidr = ''
     for (m of mask.split('.')) {
-        if (parseInt(m)>255) {throw 'ERROR: Invalid Netmask'} // Check each group is 0-255
+        if (parseInt(m)>255) {throw 'ERROR: Invalid Netmask'}
         if (parseInt(m)>0 && parseInt(m)<128) {throw 'ERROR: Invalid Netmask'}
         cidr+=(m >>> 0).toString(2)
     }
@@ -103,4 +182,21 @@ function mask2cidr(mask){
         throw 'ERROR: Invalid Netmask ' + mask
     }
     return cidr.split('1').length-1
+}
+
+function isIPv4(ip) {
+    if (typeof ip !== 'string') {return false}
+    if (/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/.test(ip)) {
+        for (octet of ip.split('.')) {
+            if (parseInt(octet)>255 || parseInt(octet)<0) {return false}
+        }
+        return true
+    }
+    return false
+} 
+
+function isIPv6(ip){
+    if (typeof ip !== 'string') {return false}
+    reg = /^((?:[0-9A-Fa-f]{1,4}))((?::[0-9A-Fa-f]{1,4}))*::((?:[0-9A-Fa-f]{1,4}))((?::[0-9A-Fa-f]{1,4}))*|((?:[0-9A-Fa-f]{1,4}))((?::[0-9A-Fa-f]{1,4})){7}((\|[0-9]{0,2}))$/
+    return reg.test(ip) // Test if this works for real in every case...
 }

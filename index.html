@@ -1,0 +1,36 @@
+<html>
+    <head>
+        <meta name=FwCAT content="Firewal Configuration Assessment Tool">
+        <title>FwCAT</title>
+        <link rel="stylesheet" href="css/bootstrap.min.css">
+        <link rel="stylesheet" href="css/fwcat.css">
+    </head>
+    <body lang=EN-US>
+        <div class="row">
+            <div class="col-2" id="left-pane">
+                <div class="row">
+                    <div class="col-1"></div>
+                    <div class="col-11"></div>
+                </div>
+            </div>
+            <div class="col-10" id="right-pane">
+                    <div class="row">
+                        <div class="col-1 ruleHead ruleNumber">#</div>
+                        <div class="col-1 ruleHead ruleAction">Action</div>
+                        <div class="col-2 ruleHead ruleAccessList">Access List</div>
+                        <div class="col-1 ruleHead ruleProtocol">Protocol</div>
+                        <div class="col-1 ruleHead ruleSource">Source Address</div>
+                        <div class="col-1 ruleHead ruleSourcePort">Source Port</div>
+                        <div class="col-1 ruleHead ruleDest">Destination Address</div>
+                        <div class="col-1 ruleHead ruleDestPort">Destination Port</div>
+                        <div class="col-2 ruleHead ruleComment">Comment</div>
+                        <div class="col-1 ruleHead ruleStatus">Status</div>
+                    </div>
+            </div>
+        </div>
+        <div id="rawResults"></div>
+    </body>
+    <script type='text/javascript' src="js/jquery-3.3.1.min.js"></script>
+    <script type='text/javascript' src="js/bootstrap.min.js"></script>
+    <script type='text/javascript' src="js/fwcat.js"></script>
+</html>
