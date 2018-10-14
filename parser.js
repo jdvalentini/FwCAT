@@ -4,7 +4,9 @@ module.exports = {
     testModule: testModule,
     parseFirewall: parseFirewall,
     ciscoParseAccessList: ciscoParseAccessList,
-    isIPv4: isIPv4
+    isIPv4: isIPv4,
+    parseLine: parseLine,
+    ciscoParseInlineProtocol: ciscoParseInlineProtocol
 }
 
 var accessListCommentBuffer = ''
@@ -36,7 +38,9 @@ function parseFirewall(configFile){
             nat:[],
             filter:[]
         },
-        notparsed:[]
+        notparsed:[],
+        objects:[],
+        objectgroups:[]
     }
     
     // var s = fs.createReadStream(configFile)
@@ -54,8 +58,33 @@ function parseFirewall(configFile){
                     if (parents.length > h+1){parents = parents.slice(0,h+1)} // Clean parents from lower hierarchies
                 }
 
-                if (k == 'rules') {
+                if (k == 'objects'){
+                    if (sk == 'parent'){cfg[k].push(Object.assign({lineNumber:lineNr},v))}
+                    else if (v.nat !== undefined){ // NAT parsing is very limited so far, it will be improved in the future
+                        var found = false
+                        for (i in cfg.objects){
+                            if (cfg.objects[i].id == v.object && !found){
+                                found = true
+                                cfg.objects[i].nat = v.nat
+                            }
+                            else if (cfg.objects[i].id == v.object && found){
+                                cfg.objects.splice(i,1)
+                            }
+                        }
+                    }
+                    else {cfg[k][cfg[k].length-1] = Object.assign(cfg[k][cfg[k].length-1],v)} // Update the last "object" element
+                    // if (sk !== 'parent')
+                }
+                else if (k == 'objectgroups'){
+                    if (sk == 'parent'){cfg[k].push(Object.assign({lineNumber:lineNr, objects:[]},v))}
+                    else {
+                        if (v.type == 'description'){cfg[k][cfg[k].length-1].description = v.description}
+                        else {cfg[k][cfg[k].length-1]['objects'].push(v)}
+                    }
+                }
+                else if (k == 'rules') {
                     if (sk == 'filter' && v !== 'remark'){cfg[k][sk].push(Object.assign({lineNumber:lineNr},v))}
+                    else if (sk == 'nat'){cfg[k][sk].push(Object.assign({lineNumber:lineNr},v))}
                 }
                 else if (k == 'interfaces') {
                     if (sk == 'id') {var obj = {}; obj[sk] = v; cfg[k].push(obj)}
@@ -167,26 +196,116 @@ function ciscoParseAccessList(ln){
     return ace
 }
 
+function ciscoTranslateOperators(command){
+    parts = command.split(' ')
+    if (parts[0] == 'lt'){return '<' + parts[1]}
+    if (parts[0] == 'gt'){return '>' + parts[1]}
+    if (parts[0] == 'eq'){return parts[1]}
+    if (parts[0] == 'neq'){return '!' + parts[1]}
+    if (parts[0] == 'range'){return parts[1] + '-' + parts[2]}
+}
+
+function ciscoParseNAT(line,hierarchy,object){
+    // NAT parsing is in an early stage of developement
+    object = object || 'No-Object-Defined'
+    var nat = {}
+    nat['realInterface'] = line.split('(')[1].split(',')[0]
+    nat['mappedInterface'] = line.split(',')[1].split(')')[0]
+ 
+    if(hierarchy ==0) {return nat}
+    else {return {object:object, nat:nat}}
+}
+
+function ciscoParseInlineProtocol(line){
+    pieces = line.split(' ').slice(2)
+    var result = {type: 'ports', protocol:line.split(' ')[1]}
+    while (pieces.length > 0){
+        if (/source|destination/.test(pieces[0])){
+            if (/lt|gt|eq|neq|range/){
+                result[pieces[0]] = ciscoTranslateOperators(pieces.slice(1).join(' '))
+                pieces = pieces.slice(2)
+            }
+            else if (/range/.test(pieces[0])){
+                result[pieces[0]] = ciscoTranslateOperators(pieces.slice(1).join(' '))
+                pieces = pieces.slice(3)
+            }
+        }
+        else {pieces.shift()}
+    }
+    return result
+}
+
 function parseLine(type, line, parents){
     if (type == 'cisco-asa'){
         // returns {h:hierarcy, k:key, sk:subkey, v:value}
         // var h = line.search(/\S|$/) // Counts whitespaces to detect the hierarchy (No error if blank)
         var h = line.search(/\S/) // Counts whitespaces to detect the hierarchy
 
+        // Parse based on first word of parent
+        if (line.search('object ') == 0) {return {h:h, k:'objects', sk:'parent', v:{id:line.split(' ')[2], type:line.split(' ')[1]}}}
+        if (line.search('object-group ') == 0) {return {h:h, k:'objectgroups', sk:'parent', v:{id:line.split(' ')[2], type:line.split(' ')[1]}}}
+        if (line.search('access-list ') == 0) {return {h:h, k:'rules', sk:'filter', v:ciscoParseAccessList(line)}}
+        if (line.search('interface ') == 0) {return {h:h, k:'interfaces', sk:'id', v:line.split(' ')[1]}}
         if (line.search('hostname ') == 0) {return {h:h, k:'host', sk:'hostname', v:line.split(' ')[1]}}
         if (line.search('domain-name ') == 0) {return {h:h, k:'host', sk:'domain', v:line.split(' ')[1]}}
+        if (line.search('nat ') == 0) {return {h:h, k:'rules', sk:'nat',v:ciscoParseNAT(line,h)}}
 
-        if (line.search('interface ') == 0) {return {h:h, k:'interfaces', sk:'id', v:line.split(' ')[1]}}
-
-        if (line.search('access-list ') == 0) {return {h:h, k:'rules', sk:'filter', v:ciscoParseAccessList(line)}}
-
-        if (h>0) { // Line is a child inside a block
+        if (h > 0) { // Line is a child inside a block
             l = line.trim()
             if (l.search('no ') == 0) {return {h:h, k:null, sk:null, v:null}} // See how to handle no...
 
             var p = parseLine(type, parents[h-1], parents)  // Recursively parse the parent line
 
-            if (p.k == 'interfaces') {
+            if (p.k == 'objects') {                     // If Parent.key is 'objects'
+                if (/^description /.test(l)) {var ret={description:l.split(' ').slice(1).join(' ')}}
+                else if (p.v.type == 'network'){
+                    if (/^host /.test(l)) {var ret={address:l.split(' ')[1], syntax:'host'}}
+                    else if (/^subnet /.test(l)) {var ret={address:l.split(' ')[1]+'/'+mask2cidr(l.split(' ')[2]), syntax:'subnet'}}
+                    else if (/^range /.test(l)) {var ret={address:l.split(' ').slice(1,3).join('-'), syntax:'range'}}
+                    else if (/^fqdn /.test(l)) {var ret={address:l.split(' ')[l.split(' ').length-1], syntax:'fqdn'}}
+                    else if (/^nat/.test(l)) {var ret=ciscoParseNAT(l,h,p.v.id)}
+                }
+                else if (p.v.type = 'service') {
+                    if (/^service icmp[6]? .+/.test(l)) {var ret={type:l.split(' ')[1], protocol:l.split(' ')[1], options:l.split(' ').slice(2).join(' ')}}
+                    else if (/^service icmp[6]?$/.test(l)) {var ret={type:l.split(' ')[1], protocol:l.split(' ')[1]}}
+                    else if (/^service (tcp|udp|sctp) /) {var ret = ciscoParseInlineProtocol(l)}
+                    else if (/^service /.test(l)) {var ret = {type: 'protocol', protocol: l.split(' ')[1]}}
+                }
+                return {h:h, k:p.k, sk:p.v.id+'-'+p.v.type, v:ret}
+            }
+            else if (p.k == 'objectgroups'){
+                if (/^description /.test(l)) {var ret={type:'description', description:l.split(' ').slice(1).join(' ')}}
+                else if (p.v.type == 'network'){
+                    if (/^network-object host /.test(l)) {var ret = {type:'host', address:l.split(' ')[2]}}
+                    else if (/^network-object object /.test(l)) {var ret = {type:'object', id:l.split(' ')[2]}}
+                    else if (/^network-object /.test(l)) {
+                        if (isIPv4(l.split(' ')[1])) {var ret = {type:'subnet', address:l.split(' ')[1]+'/'+mask2cidr(l.split(' ')[2])}}
+                        else if (isIPv6(l.split(' ')[1])) {var ret = {type:'subnet', address:l.split(' ')[1]}}
+                    }
+                    else if (/^group-object /.test(l)) {var ret = {type:'group', id:l.split(' ')[1]}}
+                }
+                else if (p.v.type == 'service'){
+// Write parse and test for service groups
+                    if (/^service-object object /.test(l)) {var ret = {type:'object', id:l.split(' ')[2]}}
+                    else if (/^service-object icmp[6]? .+/.test(l)) {
+                        var ret = {type:l.split(' ')[1],options:l.split(' ').slice(2).join(' ')}
+                    }
+                    else if (/^service-object icmp[6]?/.test(l)) {var ret = {type:l.split(' ')[1]}}
+                    else if (/^service-object (tcp|udp|tcp-udp|sctp) /.test(l)) {var ret = ciscoParseInlineProtocol(l)}
+                    else if (/^service-object /.test(l)) {var ret = {type: 'protocol', protocol: l.split(' ')[1]}}
+                    else if (/^port-object /.test(l)) {
+                        if (parents[h-1].split(' ').length == 4) {
+                            var ret = {type: 'port', protocol: parents[h-1].split(' ')[3], port: ciscoTranslateOperators(l.split(' ').slice(1).join(' '))}
+                        }
+                    }
+                    else if (/^group-object /.test(l)) {var ret = {type:'group', id:l.split(' ')[1]}}
+                }
+                else if (p.v.type == 'protocol'){
+                    if (/^protocol-object /.test(l)){var ret = {protocol:l.split(' ')[1]}}
+                }
+                return {h:h, k:p.k, sk:p.v.id+'-'+p.v.type, v:ret}
+            }
+            else if (p.k == 'interfaces') {             // If Parent.key is 'interfaces'
                 if (l.search('ip ') == 0) {
                     return {h:h, k:p.k, sk:'ip', v:l.split(' ')[2]+'/'+mask2cidr(l.split(' ')[3])}
                 }

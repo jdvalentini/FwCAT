@@ -74,4 +74,87 @@ describe('ciscoParseAccessList function', function(){
         assert.equal(ace.dstAddress, 'any4')
         assert.equal(ace.dstPort, 'object-group DST_OBJECT')
     })
+
+})
+
+
+describe('ParseLine function for cisco-asa Firewalls',() => {
+    it('Parses network and service objects', () => {
+        var result = parser.parseLine('cisco-asa', ' host 10.0.0.1', ['object network OBJHOST'])
+        assert.equal(result.sk,'OBJHOST-network')
+        assert.equal(result.v.syntax,'host')
+        assert.equal(result.v.address,'10.0.0.1')
+
+        var result = parser.parseLine('cisco-asa', ' subnet 192.168.0.0 255.255.255.0', ['object network OBJSUBNET'])
+        assert.equal(result.sk,'OBJSUBNET-network')
+        assert.equal(result.v.syntax,'subnet')
+        assert.equal(result.v.address,'192.168.0.0/24')
+
+        var result = parser.parseLine('cisco-asa', ' fqdn v4 www.example.com', ['object network OBJHOST'])
+        assert.equal(result.sk,'OBJHOST-network')
+        assert.equal(result.v.syntax,'fqdn')
+        assert.equal(result.v.address,'www.example.com')
+
+        var result = parser.parseLine('cisco-asa', ' range 192.168.254.30 192.168.254.35', ['object network OBJHOST'])
+        assert.equal(result.sk,'OBJHOST-network')
+        assert.equal(result.v.syntax,'range')
+        assert.equal(result.v.address,'192.168.254.30-192.168.254.35')
+
+        var result = parser.parseLine('cisco-asa', ' service tcp source eq 9535 destination neq 9535', ['object service OBJSRV'])
+        assert.equal(result.sk,'OBJSRV-service')
+        assert.equal(result.v.protocol,'tcp')
+        assert.equal(result.v.source,'9535')
+        assert.equal(result.v.destination,'!9535')
+
+        var result = parser.parseLine('cisco-asa', ' service sctp destination range 21 22', ['object service OBJSRV'])
+        assert.equal(result.sk,'OBJSRV-service')
+        assert.equal(result.v.protocol,'sctp')
+        assert.equal(result.v.destination,'21-22')
+
+        var result = parser.parseLine('cisco-asa', ' service icmp', ['object service OBJSRV'])
+        assert.equal(result.sk,'OBJSRV-service')
+        assert.equal(result.v.protocol,'icmp')
+
+        var result = parser.parseLine('cisco-asa', ' description This is a test for object parsing', ['object service OBJSRV'])
+        assert.equal(result.sk,'OBJSRV-service')
+        assert.equal(result.v.description,'This is a test for object parsing')
+
+        var result = parser.parseLine('cisco-asa', ' host 10.0.0.1', ['object network OBJ-10.0.0.1_ex_192.168.0.1_int'])
+        assert.equal(result.sk,'OBJ-10.0.0.1_ex_192.168.0.1_int-network')
+        assert.equal(result.v.syntax,'host')
+        assert.equal(result.v.address,'10.0.0.1')
+
+        var result = parser.parseLine('cisco-asa', 'object network obj-10.0.0.1_ex_192.168.0.1_int', [])
+        assert.equal(result.h,0)
+        assert.equal(result.k,'objects')
+        assert.equal(result.sk,'parent')
+        assert.equal(result.v.id,'obj-10.0.0.1_ex_192.168.0.1_int')
+        assert.equal(result.v.type,'network')
+    })
+
+    it('Parses network object groups', () => {
+        // object-group network OBJGROUP
+        //  network-object object OBJHOST
+        //  network-object object OBJSUBNET
+        //  network-object host 172.16.0.1
+        //  network-object 8.8.0.0 255.255.0.0
+        var result = parser.parseLine('cisco-asa', ' network-object object OBJ', ['object-group network GROUP'])
+        assert.equal(result.v.type, 'object')
+        assert.equal(result.v.id, 'OBJ')
+
+        var result = parser.parseLine('cisco-asa', ' network-object 10.0.0.0 255.0.0.0', ['object-group network GROUP'])
+        assert.equal(result.v.type, 'subnet')
+        assert.equal(result.v.address, '10.0.0.0/8')
+    })
+
+    it('Parses service object groups', () => {
+        var result = parser.parseLine('cisco-asa', ' service-object tcp destination eq 123', ['object-group service GROUP'])
+        assert.equal(result.v.protocol, 'tcp')
+        assert.equal(result.v.destination, '123')
+        assert.equal(result.v.type, 'ports')
+
+        var result = parser.parseLine('cisco-asa', ' description Service group description', ['object-group service GROUP'])
+        assert.equal(result.v.type, 'description')
+        assert.equal(result.v.description, 'Service group description')
+    })
 })
