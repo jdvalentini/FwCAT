@@ -7,6 +7,8 @@ describe('Parse configuration file: Cisco ASA 9.8', ()=> {
         parser.parseFirewall(configFile).then(data =>{
             assert.equal(data.host.hostname,'ASATEST')
             assert.equal(data.host.domain,'cisco.local')
+            assert.equal(data.host.serial,'AAA123456')
+            assert.equal(data.host.model,'ASA5525')
         })
     })
 
@@ -32,6 +34,14 @@ describe('Parse configuration file: Cisco ASA 9.8', ()=> {
             assert.equal(data.rules.filter.length, 1)
             assert.equal(data.rules.filter[0].comment, 'ACL Comment')
             assert.equal(data.rules.filter[0].protocol, 'object-group PROTOGROUP')
+        })
+    })
+
+    it('Understands NAT rules', () => {
+        parser.parseFirewall(configFile).then(data =>{
+            assert.equal(data.rules.nat.length, 1)
+            assert.equal(data.rules.nat[0].realInterface, 'ETH0')
+            assert.equal(data.rules.nat[0].mappedInterface, 'ETH1')
         })
     })
 })
