@@ -2,9 +2,15 @@ const log = require('electron-log');
 const network = require(__dirname + '/lib/network.js')
 const cisco = require(__dirname + '/lib/parser-cisco.js')
 
+log.transports.console.level = false;
+log.transports.file.level = 'info';
+
 module.exports = {
     parseFirewall: parseFirewall,
     parseLine: parseLine,
+    selectAccessList: selectAccessList,
+    selectObjectGroup: selectObjectGroup,
+    selectObject: selectObject,
 }
 
 function detectType(configFile){
@@ -32,12 +38,12 @@ function parseFirewall(configFile){
         objects:[],         // CISCO ASA: Network and Service Objects
         objectgroups:[]     // CISCO ASA: Object Groups
     }
+
     cfg.host.fwType = detectType(configFile)
     
-    // var s = fs.createReadStream(configFile)
     return new Promise((resolve, reject) => { var s = fs.createReadStream(configFile)
         .pipe(es.split())
-        .pipe(es.mapSync(function(line){ // change to arrow
+        .pipe(es.mapSync((line) => {
             s.pause();
 
             lineNumber += 1;
@@ -53,11 +59,11 @@ function parseFirewall(configFile){
             s.resume();
             })
             .on('error', function(err){
-                console.log('Error while reading file.', err);
+                log.error('Error while reading file.', err);
                 reject(err)
             })
             .on('end', function(){
-                console.log('Read entire file: ' + lineNumber + ' lines.')
+                log.info('Read entire file: ' + lineNumber + ' lines.')
                 resolve(cfg)
             })
         );
@@ -73,4 +79,23 @@ function parseLine(type, line, parents, aceNumber){
         return {h:config.h, k:config.k, sk:config.sk, v:config.v}
     }
     else {throw 'No valid Firewall type detected'}
+}
+
+
+function selectAccessList(CONFIG, ACL){
+    return CONFIG.rules.filter.filter((ACE) => {
+        return ACE.acl === ACL
+    })
+}
+
+function selectObjectGroup(CONFIG,GROUPNAME){
+    return CONFIG.objectgroups.filter((GROUPS) => {
+        return GROUPS.id === GROUPNAME
+    })
+}
+
+function selectObject(CONFIG,OBJECTNAME){
+    return CONFIG.objects.filter((OBJECTS) => {
+        return OBJECTS.id === OBJECTNAME
+    })
 }
