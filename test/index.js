@@ -1,26 +1,28 @@
-var parser = require('../parser.js');
-var assert = require('assert');
+const parser = require('../parser.js');
+const cisco = require('../lib/parser-cisco.js')
+const network = require('../lib/network.js')
+const assert = require('assert');
 
 describe('isIPv4 function',()=>{
     it('Returns false when IP is not a string', () =>{
-        assert.equal(parser.isIPv4(10),false)
+        assert.equal(network.isIPv4(10),false)
     })
     it('Returns false when IP is invalid', () =>{
-        assert.equal(parser.isIPv4('10.0.0.1000'),false)
-        assert.equal(parser.isIPv4('10.0.0.x'),false)
-        assert.equal(parser.isIPv4('10.0.256.0'),false)
-        assert.equal(parser.isIPv4('10.-1.0.1'),false)
-        assert.equal(parser.isIPv4('58'),false)
+        assert.equal(network.isIPv4('10.0.0.1000'),false)
+        assert.equal(network.isIPv4('10.0.0.x'),false)
+        assert.equal(network.isIPv4('10.0.256.0'),false)
+        assert.equal(network.isIPv4('10.-1.0.1'),false)
+        assert.equal(network.isIPv4('58'),false)
     })
     it('Returns true when IP is a valid IPv4', () =>{
-        assert.equal(parser.isIPv4(10),false)
+        assert.equal(network.isIPv4(10),false)
     })
 })
 
-describe('ciscoParseAccessList function', function(){
+describe('Cisco Module: parseAccessList function', function(){
     it('Parses standard ACEs', function(){
         var test = 'access-list ACLNAME standard permit 192.168.0.0 255.255.0.0'
-        var ace = parser.ciscoParseAccessList(test)
+        var ace = cisco.parseAccessList(test,1)
         assert.equal(ace.line, test)
         assert.equal(ace.acl, 'ACLNAME')
         assert.equal(ace.type, 'standard')
@@ -31,7 +33,7 @@ describe('ciscoParseAccessList function', function(){
 
     it('Parses extended ACEs based on address', function(){
         var test = 'access-list ACLNAME extended deny ip any4 object-group DST_OBJECT'
-        var ace = parser.ciscoParseAccessList(test)
+        var ace = cisco.parseAccessList(test,1)
         assert.equal(ace.line, test)
         assert.equal(ace.acl, 'ACLNAME')
         assert.equal(ace.type, 'extended')
@@ -41,7 +43,7 @@ describe('ciscoParseAccessList function', function(){
         assert.equal(ace.dstAddress, 'object-group DST_OBJECT')
 
         var test = 'access-list ACLNAME extended deny ip any4 8.8.8.0 255.255.254.0'
-        var ace = parser.ciscoParseAccessList(test)
+        var ace = cisco.parseAccessList(test,1,'access-list ACLNAME remark This is a comment')
         assert.equal(ace.line, test)
         assert.equal(ace.acl, 'ACLNAME')
         assert.equal(ace.type, 'extended')
@@ -49,11 +51,12 @@ describe('ciscoParseAccessList function', function(){
         assert.equal(ace.protocol, 'ip')
         assert.equal(ace.srcAddress, 'any4')
         assert.equal(ace.dstAddress, '8.8.8.0/23')
+        assert.equal(ace.comment, 'This is a comment')
     })
 
     it('Parses extended ACEs based on address and ports', function(){
         var test = 'access-list ACLNAME extended permit object-group SRV_OBJECT any4 object-group DST_OBJECT'
-        var ace = parser.ciscoParseAccessList(test)
+        var ace = cisco.parseAccessList(test,1)
         assert.equal(ace.line, test)
         assert.equal(ace.acl, 'ACLNAME')
         assert.equal(ace.type, 'extended')
@@ -63,7 +66,7 @@ describe('ciscoParseAccessList function', function(){
         assert.equal(ace.dstAddress, 'object-group DST_OBJECT')
 
         var test = 'access-list ACLNAME extended permit tcp host 10.0.0.1 eq 12345 any4 object-group DST_OBJECT'
-        var ace = parser.ciscoParseAccessList(test)
+        var ace = cisco.parseAccessList(test,1)
         assert.equal(ace.line, test)
         assert.equal(ace.acl, 'ACLNAME')
         assert.equal(ace.type, 'extended')
@@ -133,11 +136,6 @@ describe('ParseLine function for cisco-asa Firewalls',() => {
     })
 
     it('Parses network object groups', () => {
-        // object-group network OBJGROUP
-        //  network-object object OBJHOST
-        //  network-object object OBJSUBNET
-        //  network-object host 172.16.0.1
-        //  network-object 8.8.0.0 255.255.0.0
         var result = parser.parseLine('cisco-asa', ' network-object object OBJ', ['object-group network GROUP'])
         assert.equal(result.v.type, 'object')
         assert.equal(result.v.id, 'OBJ')
@@ -156,5 +154,11 @@ describe('ParseLine function for cisco-asa Firewalls',() => {
         var result = parser.parseLine('cisco-asa', ' description Service group description', ['object-group service GROUP'])
         assert.equal(result.v.type, 'description')
         assert.equal(result.v.description, 'Service group description')
+    })
+
+    it('Parses NAT rules', () => {
+        var result = cisco.parseNAT('nat (New-Inside,New-Outside) source static 192.168.0.1 8.8.0.1', 0)
+        assert.equal(result.realInterface,'New-Inside')
+        assert.equal(result.mappedInterface,'New-Outside')
     })
 })
