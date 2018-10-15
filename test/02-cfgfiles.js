@@ -10,6 +10,14 @@ describe('Parse configuration file: Cisco ASA 9.8', ()=> {
         })
     })
 
+    it('Understands interfaces', () => {
+        parser.parseFirewall(configFile).then(data =>{
+            assert.equal(data.interfaces.length, 1)
+            assert.equal(data.interfaces[0].ip, '10.0.0.1/26')
+            assert.equal(data.interfaces[0]['security-level'], '100')
+        })
+    })
+
     it('Understands objects', () => {
         parser.parseFirewall(configFile).then(data =>{
             assert.equal(data.objects.length,2)
