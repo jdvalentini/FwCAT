@@ -9,8 +9,6 @@ module.exports = {
     ciscoParseInlineProtocol: ciscoParseInlineProtocol
 }
 
-var accessListCommentBuffer = ''
-var ACEnumber = 0
 
 function testModule(message){
     console.log(message)
@@ -20,6 +18,9 @@ function detectType(configFile){
     // This function will eventually autodetect the firewall type
     return('cisco-asa')
 }
+
+var accessListCommentBuffer = {}
+var ACEnumber = 0
 
 function parseFirewall(configFile){
     const fs = require('fs')
@@ -83,7 +84,7 @@ function parseFirewall(configFile){
                     }
                 }
                 else if (k == 'rules') {
-                    if (sk == 'filter' && v !== 'remark'){cfg[k][sk].push(Object.assign({lineNumber:lineNr},v))}
+                    if (sk == 'filter' && v.number !== undefined){cfg[k][sk].push(Object.assign({lineNumber:lineNr},v))}
                     else if (sk == 'nat'){cfg[k][sk].push(Object.assign({lineNumber:lineNr},v))}
                 }
                 else if (k == 'interfaces') {
@@ -131,16 +132,17 @@ function ciscoParseAccessList(ln){
 
     if (expanded[0] == 'remark') {
         ace.comment = expanded.slice(1).join(' ')
-        accessListCommentBuffer = expanded.slice(1).join(' ')
-        return 'remark'
+        // accessListCommentBuffer = expanded.slice(1).join(' ')
+        accessListCommentBuffer = ace
+        return ace
     }
     else {
         // ACE order numer
         ACEnumber += 1
         ace.number = ACEnumber
         // Clear comment buffer
-        ace.comment = accessListCommentBuffer
-        accessListCommentBuffer = ''
+        if (accessListCommentBuffer.acl == ace.acl) {ace.comment = accessListCommentBuffer.comment}
+        accessListCommentBuffer = {}
         // Check the type of rule
         if (expanded[0] == 'extended') {
             ace.type = 'extended'
