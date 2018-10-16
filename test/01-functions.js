@@ -3,7 +3,7 @@ const cisco = require('../lib/parser-cisco.js')
 const network = require('../lib/network.js')
 const assert = require('assert');
 
-describe('isIPv4 function',()=>{
+describe('Network Module: isIPv4 function',()=>{
     it('Returns false when IP is not a string', () =>{
         assert.equal(network.isIPv4(10),false)
     })
@@ -81,7 +81,7 @@ describe('Cisco Module: parseAccessList function', function(){
 })
 
 
-describe('ParseLine function for cisco-asa Firewalls',() => {
+describe('Cisco Module: typedParseLine function',() => {
     it('Parses network and service objects', () => {
         var result = parser.parseLine('cisco-asa', ' host 10.0.0.1', ['object network OBJHOST'])
         assert.equal(result.sk,'OBJHOST-network')

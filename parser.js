@@ -34,6 +34,7 @@ function parseFirewall(configFile){
             nat:[],         // NAT rules
             filter:[]       // Filter rules
         },
+        routes:[],
         notparsed:[],       // Lines that could not be understood
         objects:[],         // CISCO ASA: Network and Service Objects
         objectgroups:[]     // CISCO ASA: Object Groups
