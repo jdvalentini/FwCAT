@@ -14,7 +14,7 @@ describe('Parse configuration file: Cisco ASA 9.8', ()=> {
 
     it('Understands interfaces', () => {
         parser.parseFirewall(configFile).then(data =>{
-            assert.equal(data.interfaces.length, 1)
+            assert.equal(data.interfaces.length, 3)
             assert.equal(data.interfaces[0].ip, '10.0.0.1/26')
             assert.equal(data.interfaces[0]['security-level'], '100')
         })
@@ -42,6 +42,15 @@ describe('Parse configuration file: Cisco ASA 9.8', ()=> {
             assert.equal(data.rules.nat.length, 1)
             assert.equal(data.rules.nat[0].realInterface, 'ETH0')
             assert.equal(data.rules.nat[0].mappedInterface, 'ETH1')
+        })
+    })
+
+    it('Understands DNS servers', () => {
+        parser.parseFirewall(configFile).then(data =>{
+            assert.equal(data.interfaces[1].dns[0], '10.0.1.1')
+            assert.equal(data.interfaces[1].dns[1], '10.0.1.2')
+            assert.equal(data.interfaces[1].dns.length, 2)
+            assert.equal(data.interfaces[2].dns[0], '8.8.8.8')
         })
     })
 })
