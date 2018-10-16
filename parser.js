@@ -31,11 +31,11 @@ function parseFirewall(configFile){
         users:[],           // Stores users defined in the config file.
         interfaces:[],      // Stores an array of interface objects with their properties.
         rules:{
-            nat:[],         // NAT rules
-            filter:[]       // Filter rules
+            nat:[],         // List of NAT rules
+            filter:[]       // List of Filter rules
         },
-        routes:[],
-        notparsed:[],       // Lines that could not be understood
+        routes:[],          // Stores route objects: {interface, destination, via, metric}
+        notparsed:[],       // Stores lines that could not be understood
         objects:[],         // CISCO ASA: Network and Service Objects
         objectgroups:[]     // CISCO ASA: Object Groups
     }

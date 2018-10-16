@@ -73,7 +73,7 @@ describe('Cisco Module: parseAccessList function', function(){
         assert.equal(ace.action, 'permit')
         assert.equal(ace.protocol, 'tcp')
         assert.equal(ace.srcAddress, '10.0.0.1')
-        assert.equal(ace.srcPort, 'eq 12345')
+        assert.equal(ace.srcPort, '12345')
         assert.equal(ace.dstAddress, 'any4')
         assert.equal(ace.dstPort, 'object-group DST_OBJECT')
     })

@@ -6,7 +6,7 @@ describe('Parse configuration file: Cisco ASA 9.8', ()=> {
     it('Understands host parameters', () => {
         parser.parseFirewall(configFile).then(data =>{
             assert.equal(data.host.hostname,'ASATEST')
-            assert.equal(data.host.domain,'cisco.local')
+            assert.equal(data.host.domainname,'cisco.local')
             assert.equal(data.host.serial,'AAA123456')
             assert.equal(data.host.model,'ASA5525')
         })
@@ -50,7 +50,22 @@ describe('Parse configuration file: Cisco ASA 9.8', ()=> {
             assert.equal(data.interfaces[1].dns[0], '10.0.1.1')
             assert.equal(data.interfaces[1].dns[1], '10.0.1.2')
             assert.equal(data.interfaces[1].dns.length, 2)
+            assert.equal(data.interfaces[1].dnslookup, 'enabled')
             assert.equal(data.interfaces[2].dns[0], '8.8.8.8')
+        })
+    })
+
+    it('Understands route table', () => {
+        parser.parseFirewall(configFile).then(data =>{
+            assert.equal(data.routes[0].interface, 'ETH1')
+            assert.equal(data.routes[0].destination, 'default')
+            assert.equal(data.routes[0].via, '10.0.0.254')
+            assert.equal(data.routes[0].metric, '1')
+
+            assert.equal(data.routes[1].interface, 'ETH0')
+            assert.equal(data.routes[1].destination, '10.0.0.0/8')
+            assert.equal(data.routes[1].via, '10.254.254.254')
+            assert.equal(data.routes[1].metric, '10')
         })
     })
 })
