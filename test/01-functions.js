@@ -19,6 +19,17 @@ describe('Network Module: isIPv4 function',()=>{
     })
 })
 
+describe('Network Module: subnet2cidr function',()=>{
+    it('Returns IP/prefix given network IP and mask', () =>{
+        assert.equal(network.subnet2cidr('10.0.0.0','255.0.0.0'),'10.0.0.0/8')
+    })
+    it('Throws error when IP or Mask is invalid', () =>{
+        assert.throws(function(){network.subnet2cidr(0,'255.255.255.0')},Error)
+        assert.throws(function(){network.subnet2cidr('10.0.0.0','255.255.255')},Error)
+        assert.throws(function(){network.subnet2cidr('10.0.0.0','255.255.0.255')},Error)
+    })
+})
+
 describe('Cisco Module: parseAccessList function', function(){
     it('Parses standard ACEs', function(){
         var test = 'access-list ACLNAME standard permit 192.168.0.0 255.255.0.0'
