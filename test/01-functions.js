@@ -19,14 +19,22 @@ describe('Network Module: isIPv4 function',()=>{
     })
 })
 
-describe('Network Module: subnet2cidr function',()=>{
+describe('Network Module: ip2cidr function',()=>{
     it('Returns IP/prefix given network IP and mask', () =>{
-        assert.equal(network.subnet2cidr('10.0.0.0','255.0.0.0'),'10.0.0.0/8')
+        assert.equal(network.ip2cidr('10.0.0.0','255.0.0.0'),'10.0.0.0/8')
     })
+
     it('Throws error when IP or Mask is invalid', () =>{
-        assert.throws(function(){network.subnet2cidr(0,'255.255.255.0')},Error)
-        assert.throws(function(){network.subnet2cidr('10.0.0.0','255.255.255')},Error)
-        assert.throws(function(){network.subnet2cidr('10.0.0.0','255.255.0.255')},Error)
+        assert.throws(function(){network.ip2cidr(0,'255.255.255.0')},Error)
+        assert.throws(function(){network.ip2cidr('10.0.0.0','255.255.255')},Error)
+        assert.throws(function(){network.ip2cidr('10.0.0.0','255.255.0.255')},Error)
+    })
+
+    it('Converts to network address when specified', () =>{
+        assert.equal(network.ip2cidr('10.1.23.5','255.0.0.0',true),'10.0.0.0/8')
+        assert.equal(network.ip2cidr('192.168.1.143','255.255.255.128',true),'192.168.1.128/25')
+        assert.equal(network.ip2cidr('172.16.3.100','255.255.254.0',true),'172.16.2.0/23')
+        assert.equal(network.ip2cidr('172.16.3.100','255.255.254.0'),'172.16.3.100/23')
     })
 })
 
