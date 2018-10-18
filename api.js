@@ -28,7 +28,7 @@ app.post('/', function(req, res){
             res.end(JSON.stringify({status:'ready'}, null, 2) + '\r\n');
         })
     } else {
-        res.writeHead(200, {'Content-Type': 'text/json'});
+        res.writeHead(418, {'Content-Type': 'text/json'});      // I'm a teapot! ;)
         res.end(JSON.stringify({error:'Command is not valid'}));
     }
 });
@@ -36,19 +36,54 @@ app.post('/', function(req, res){
 
 // Sets up get listeners once the config is parsed
 function setupListeners(configJSON){
-    app.get('/selectobject', function(req, res){
-        log.silly('GET /object')
-        var json = parser.selectObject(configJSON,req.query.id)
-        res.writeHead(200, {'Content-Type': 'text/json'});
-        res.end(JSON.stringify(json, null, 2) + '\r\n');
+    /**
+     *  Gets information regarding a specific object
+     *  URL: /selectobject?id=objectid&key=[objects|objectgroups|interfaces|users]
+     */
+    app.get('/selectitem', function(req, res){
+        if (req.query.id === undefined || req.query.key === undefined) {
+            res.writeHead(400, {'Content-Type': 'text/json'})
+            res.end(JSON.stringify({error:'ID missing'}));
+        }
+        else {
+            log.silly('GET /object : ' + JSON.stringify(req.query))
+            try {
+                var json = parser.selectItem(configJSON,req.query.key,req.query.id)
+                res.writeHead(200, {'Content-Type': 'text/json'});
+                res.end(JSON.stringify(json, null, 2) + '\r\n');
+            }
+            catch(error){
+                res.writeHead(500, {'Content-Type': 'text/json'})
+                res.end(JSON.stringify({error:error.message}) + '\r\n');
+            }
+        }
     });
+
+    /**
+     *  Gets a paged list of objects for a certain type
+     *  URL: /listitems?key=type&per_page=10&page=1
+     * 
+     *  key can take [objects|objectgroups|routes|interfaces|users|notparsed]
+     */
     app.get('/listitems', function(req, res){
-        log.silly('GET /listitems ' + JSON.stringify(req.query))
-        perPage = req.query.per_page || 'ALL'
-        page = req.query.page || 1
-        var json = parser.listItems(configJSON, req.query.key, perPage, page)
-        res.writeHead(200, {'Content-Type': 'text/json'});
-        res.end(JSON.stringify(json, null, 2) + '\r\n');
+        if (req.query.key === undefined) {
+            res.writeHead(400, {'Content-Type': 'text/json'})
+            res.end(JSON.stringify({error:'Key missing'}));
+        }
+        else {
+            log.silly('GET /listitems : ' + JSON.stringify(req.query))
+            perPage = req.query.per_page || 'ALL'
+            page = req.query.page || 1
+            try {
+                var json = parser.listItems(configJSON, req.query.key, perPage, page)
+                res.writeHead(200, {'Content-Type': 'text/json'});
+                res.end(JSON.stringify(json, null, 2) + '\r\n');
+            }
+            catch(error) {
+                res.writeHead(500, {'Content-Type': 'text/json'})
+                res.end(JSON.stringify({error:error.message}) + '\r\n');
+            }
+        }
     });
 }
 
