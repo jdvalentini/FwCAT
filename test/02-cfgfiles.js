@@ -68,4 +68,13 @@ describe('Parse configuration file: Cisco ASA 9.8', ()=> {
             assert.equal(data.routes[1].metric, '10')
         })
     })
+
+    it('Understands system users', () => {
+        parser.parseFirewall(configFile).then(data =>{
+            assert.equal(data.users[0].id, 'admin')
+            assert.equal(data.users[0].hash, 'hash3dp4ss')
+            assert.equal(data.users[0].encrypted, true)
+            assert.equal(data.users[0].privilege, '15')
+        })
+    })
 })
