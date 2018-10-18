@@ -224,7 +224,32 @@ describe('Parser: listItems function', () => {
         assert.equal(list.list[0].id,'test9')
     })
 
-    it('Returns an error string if the item key requested is invalid', () => {
-        assert.equal(parser.listItems(configJSON,'invalidkey',3,5).error,'Invalid Key')
+    it('Throws error string if the item key requested is invalid', () => {
+        assert.throws(function(){parser.listItems(configJSON,'invalidkey',3,5)},Error)
+    })
+})
+
+describe('Parser: selectItem function', () => {
+    var configJSON = {
+        interfaces:[
+            {id:'Gigabit1', ip: "10.0.0.1/24"},
+            {id:'Management0', ip: "10.0.0.2/24"},
+            {id:'Portchannel0.1', ip: "10.0.0.3/24"},
+            {id:'Management0', ip: "10.0.0.4/24"}
+        ]
+    }
+    it('Returns details on a given item ID and type of object', () => {
+        item = parser.selectItem(configJSON,'interfaces','Portchannel0.1')
+        assert.equal(item.item.ip,"10.0.0.3/24")
+    })
+
+    it('Returns a warning if the item ID is not unique', () => {
+        item = parser.selectItem(configJSON,'interfaces','Management0')
+        assert.equal(item.item.ip,"10.0.0.2/24")
+        assert.equal(item.warning,'Multiple items selected')
+    })
+
+    it('Throws error string if the item key requested is invalid', () => {
+        assert.throws(function(){parser.selectItem(configJSON,'invalidkey','test')},Error)
     })
 })
