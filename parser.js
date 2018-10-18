@@ -11,6 +11,7 @@ module.exports = {
     selectObjectGroup: selectObjectGroup,
     selectObject: selectObject,
     listItems: listItems,
+    selectItem: selectItem,
 }
 
 function detectType(configFile){
@@ -102,7 +103,7 @@ function selectObject(CONFIG,OBJECTNAME){
 }
 
 /**
- * Retrieve a list of objects from the parsed config
+ * Retrieves a list of objects from the parsed config
  * @param {object} CONFIG - Config JSON obtained from parsing the config file
  * @param {string} KEY - Key to retreive, choose [objects|objectgroups|routes|interfaces|users|notparsed]
  * @param {number} [PERPAGE] - Amount of objects per page or ALL (default)
@@ -114,7 +115,8 @@ function listItems(CONFIG,KEY,PERPAGE,PAGE){
     PAGE = PAGE || 1
     PERPAGE = PERPAGE || 'ALL'
 
-    if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {return {error:'Invalid Key'}}
+    // if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {return {error:'Invalid Key'}}
+    if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {throw new Error('Invalid Key')}
 
     if (PERPAGE > CONFIG[KEY].length) {PERPAGE = 'ALL'}
 
@@ -129,4 +131,23 @@ function listItems(CONFIG,KEY,PERPAGE,PAGE){
         size:{items:total, pages:pages, page:PAGE, pagesize:pagesize},
         list:CONFIG[KEY].slice(start,end)
     }
+}
+
+
+/**
+ * Retrieves details of a given item.
+ * 
+ * @param {object} CONFIG - Config JSON obtained from parsing the config file
+ * @param {string} KEY - Key to retreive, choose [objects|objectgroups|interfaces|users]
+ * @param {string} ID - ID for the item
+ * 
+ * @returns {object} Paged list of items of the selected key
+ */
+function selectItem(CONFIG,KEY,ID){
+    if (!(/objects|objectgroups|interfaces|users/.test(KEY))) {throw new Error('Invalid Key')}
+    selection = CONFIG[KEY].filter((OBJECTS) => {
+        return OBJECTS.id === ID
+    })
+    if (selection.length > 1) {return {warning:'Multiple items selected', item:selection[0], others:selection.slice(1)}}
+    else {return {item:selection[0]}}
 }
