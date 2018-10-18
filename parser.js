@@ -1,5 +1,4 @@
 const log = require('electron-log');
-const network = require(__dirname + '/lib/network.js')
 const cisco = require(__dirname + '/lib/parser-cisco.js')
 
 log.transports.console.level = false;
@@ -11,6 +10,7 @@ module.exports = {
     selectAccessList: selectAccessList,
     selectObjectGroup: selectObjectGroup,
     selectObject: selectObject,
+    listItems: listItems,
 }
 
 function detectType(configFile){
@@ -99,4 +99,30 @@ function selectObject(CONFIG,OBJECTNAME){
     return CONFIG.objects.filter((OBJECTS) => {
         return OBJECTS.id === OBJECTNAME
     })
+}
+
+/**
+ * Retrieve a list of objects from the parsed config
+ * @param {object} CONFIG - Config JSON obtained from parsing the config file
+ * @param {string} KEY - Key to retreive, choose [objects|objectgroups|routes|interfaces|users|notparsed]
+ * @param {number} [PERPAGE] - Amount of objects per page or ALL (default)
+ * @param {number} [PAGE] - Page number. By default retrieves 1st page
+ * 
+ * @returns {object} Paged list of items of the selected key
+ */
+function listItems(CONFIG,KEY,PERPAGE,PAGE){
+    PAGE = PAGE || 1
+    PERPAGE = PERPAGE || 'ALL'
+
+    if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {return {error:'Invalid Key'}}
+
+    total    = CONFIG[KEY].length
+    pages    = (PERPAGE === 'ALL') ? 1 : Math.ceil(total/PERPAGE)
+    pagesize = (PERPAGE === 'ALL') ? total : PERPAGE
+    start    = (PERPAGE === 'ALL') ? 0 : PERPAGE*(PAGE-1)
+    end      = (PERPAGE === 'ALL') ? total : PERPAGE*(PAGE)
+    return {
+        size:{items:total, pages:pages, page:PAGE, pagesize:pagesize},
+        list:CONFIG[KEY].slice(start,end)
+    }
 }
