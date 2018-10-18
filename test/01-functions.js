@@ -99,7 +99,6 @@ describe('Cisco Module: parseAccessList function', function(){
 
 })
 
-
 describe('Cisco Module: typedParseLine function',() => {
     it('Parses network and service objects', () => {
         var result = parser.parseLine('cisco-asa', ' host 10.0.0.1', ['object network OBJHOST'])
@@ -179,5 +178,53 @@ describe('Cisco Module: typedParseLine function',() => {
         var result = cisco.parseNAT('nat (New-Inside,New-Outside) source static 192.168.0.1 8.8.0.1', 0)
         assert.equal(result.realInterface,'New-Inside')
         assert.equal(result.mappedInterface,'New-Outside')
+    })
+})
+
+describe('Parser: listItems function', () => {
+    var configJSON = {
+        routes:[
+            {id:'test1'},{id:'test2'},{id:'test3'},{id:'test4'},{id:'test5'},
+            {id:'test6'},{id:'test7'},{id:'test8'},{id:'test9'},{id:'test10'}
+        ]
+    }
+
+    it('Separates in pages the listed results', () => {
+        var list = parser.listItems(configJSON,'routes',4)
+        assert.equal(list.size.pages,3)
+        assert.equal(list.size.items,10)
+        assert.equal(list.size.page,1)
+        assert.equal(list.size.pagesize,4)
+        assert.equal(list.list.length,4)
+
+        list = parser.listItems(configJSON,'routes',4,3)
+        assert.equal(list.list.length,2)
+        assert.equal(list.list[1].id,'test10')
+
+        list = parser.listItems(configJSON,'routes')
+        assert.equal(list.size.pages,1)
+        assert.equal(list.size.items,10)
+        assert.equal(list.size.page,1)
+        assert.equal(list.size.pagesize,10)
+        assert.equal(list.list.length,10)
+        assert.equal(list.list[9].id,'test10')
+    })
+
+    it('Sets "ALL" as page size if requested is bigger than length',() => {
+        list = parser.listItems(configJSON,'routes',15)
+        assert.equal(list.size.pagesize,10)
+        assert.equal(list.size.pages,1)
+        assert.equal(list.list[5].id,'test6')
+    })
+
+    it('Returns last page if page is after the last',() => {
+        list = parser.listItems(configJSON,'routes',4,4)
+        assert.equal(list.size.page,3)
+        assert.equal(list.size.pages,3)
+        assert.equal(list.list[0].id,'test9')
+    })
+
+    it('Returns an error string if the item key requested is invalid', () => {
+        assert.equal(parser.listItems(configJSON,'invalidkey',3,5).error,'Invalid Key')
     })
 })

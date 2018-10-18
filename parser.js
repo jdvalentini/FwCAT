@@ -116,9 +116,13 @@ function listItems(CONFIG,KEY,PERPAGE,PAGE){
 
     if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {return {error:'Invalid Key'}}
 
+    if (PERPAGE > CONFIG[KEY].length) {PERPAGE = 'ALL'}
+
     total    = CONFIG[KEY].length
     pages    = (PERPAGE === 'ALL') ? 1 : Math.ceil(total/PERPAGE)
     pagesize = (PERPAGE === 'ALL') ? total : PERPAGE
+    if (PAGE > pages) {PAGE = pages}
+
     start    = (PERPAGE === 'ALL') ? 0 : PERPAGE*(PAGE-1)
     end      = (PERPAGE === 'ALL') ? total : PERPAGE*(PAGE)
     return {
