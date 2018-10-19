@@ -4,6 +4,117 @@ const cisco = require(__dirname + '/lib/parser-cisco.js')
 log.transports.console.level = false;
 log.transports.file.level = 'info';
 
+/**
+ * Details on Firewall
+ * @typedef {Object} fwcHost
+ * @property {string} fwType - Firewall syntax detected by the parser
+ * @property {string} [serial] - Serial number
+ * @property {string} [model] - Firewall model
+ * @property {string} [hostname] - Hostname
+ * @property {string} [domainname] - Domain Name
+ */
+
+/**
+ * System users
+ * @typedef {Object} fwcUser
+ * @property {string} id - User name or unique identifier
+ * @property {string} [privilege] - Privilege level or codename (Depends on the firewall)
+ * @property {string} [hash] - Hashed password of the user
+ * @property {boolean} [encrypted] - Is the password encrypted?
+ */
+
+/**
+ * System interfaces
+ * @typedef {Object} fwcInterface
+ * @property {string} id - Interface physical name or unique identifier
+ * @property {string} [nameif] - Interface logical name
+ * @property {string} [securitylevel] - Cisco security level for this interface
+ * @property {string} [ip] - IP address and netmask in CIDR notation
+ * @property {boolean} [dnslookup] - Is the interface allowed to send DNS requests?
+ * @property {string[]} [dns] - A list of DNS servers (in order of priority)
+ */
+
+/**
+ * NAT rules
+ * @typedef {Object} fwcNAT
+ * @property {string} realInterface - Obfuscated interface
+ * @property {string} mappedInterface - Public interface
+ */
+
+/**
+ * Filter Rules
+ * @typedef {Object} fwcFilter
+ * @property {string} acl - The name of the Access Control List
+ * @property {number} lineNumber - The line number in the config file
+ * @property {string} line - The line of the configuration file where this ACE is configured
+ * @property {number} number - The number of Access Control Entry (Ordering)
+ * @property {string} [type] - Rule classification [standard|extended]
+ * @property {string} action - What happens when the rule matches [permit,deny,drop,log]
+ * @property {string} protocol - Protocol matched
+ * @property {string} [srcAddress] - Source Address
+ * @property {string} [srcPort] - Source Port
+ * @property {string} [dstAddress] - Destination Address
+ * @property {string} [dstPort] - Destination Port
+ * @property {string} [comment] - Comments on this rule
+ */
+
+/**
+ * Rules
+ * @typedef {Object} fwcRules
+ * @property {fwcNAT[]} nat - List of NAT rules
+ * @property {fwcFilter[]} filter - List of Filter rules
+ */
+
+/**
+ * Routes
+ * @typedef {Object} fwcRoute
+ * @property {string} [interface] - Interface to which the route is applied
+ * @property {string} destination - Destination subnet
+ * @property {string} via - Gateway for this route
+ * @property {string} [metric] - Route priority
+ */
+
+/**
+ * Objects
+ * @typedef {Object} fwcObject
+ * @property {string} id - Name or unique identifier
+ * @property {string} type - Type of object [network|service]
+ * @property {string} address - address for the host or subnet
+ * @property {string} syntax - How was the address specified
+ * @property {string} description - Description of the object
+ * @property {number} lineNumber - The line number in the config file
+ * @property {string} protocol - Protocol (for service objects)
+ * @property {string} destination - Destination port (for service objects)
+ * @property {string} source - Destination port (for service objects)
+ * @property {string} options - Unparsed options for general protocols such as ICMP
+ */
+
+
+/**
+ * Object groups
+ * @typedef {Object} fwcObjectgroup
+ * @property {string} id - Name or unique identifier
+ * @property {string} type - Type of object group [network|service]
+ * @property {fwcObject[]} objects - List of objects
+ */
+
+
+/**
+ * The results of this parser are based on an fwConfig object.
+ * @typedef {Object} fwConfig
+ * @property {fwcHost} host - Describes host parameters.
+ * @property {fwcUser[]} users - List of users.
+ * @property {fwcInterface[]} interfaces - List of interfaces.
+ * @property {fwcRules} rules - Contains 2 lists for NAT and Filter rules.
+ * @property {fwcNAT[]} rules.nat - List of NAT rules.
+ * @property {fwcFilter[]} rules.filter - List of filter rules.
+ * @property {fwcRoute[]} routes - List of routes.
+ * @property {fwcObject[]} objects - List of objects.
+ * @property {fwcObjectgroup[]} objectgroups - List of objectgroups.
+ * @property {string[]} notparsed - List of lines that could not be parsed.
+ * 
+ */
+
 module.exports = {
     parseFirewall: parseFirewall,
     parseLine: parseLine,
@@ -12,17 +123,28 @@ module.exports = {
     selectObject: selectObject,
     listItems: listItems,
     selectItem: selectItem,
+    listRules: listRules,
 }
 
-function detectType(configFile){
+/**
+ * Detects the type of a of a firewall by inspecting its configuration file
+ * @param {string} CONFIGFILE - Full path to the configuration file
+ * 
+ * @returns {string} Firewall parsing routinge codename
+ */
+function detectType(CONFIGFILE){
     // This function will eventually autodetect the firewall type - DEVELOPEMENT PENDING
     return('cisco-asa')
 }
 
-function parseFirewall(configFile){
+/**
+ * Parses a firewall by inspecting its configuration file
+ * @param {string} CONFIGFILE - Full path to the configuration file
+ * 
+ * @returns {fwConfig} An object with the parsed configuration
+ */
+function parseFirewall(CONFIGFILE){
     const fs = require('fs')
-    // const util = require('util')
-    // const stream = require('stream')
     const es = require('event-stream')
 
     var lineNumber = 0;
@@ -41,9 +163,9 @@ function parseFirewall(configFile){
         objectgroups:[]     // CISCO ASA: Object Groups
     }
 
-    cfg.host.fwType = detectType(configFile)
+    cfg.host.fwType = detectType(CONFIGFILE)
     
-    return new Promise((resolve, reject) => { var s = fs.createReadStream(configFile)
+    return new Promise((resolve, reject) => { var s = fs.createReadStream(CONFIGFILE)
         .pipe(es.split())
         .pipe(es.mapSync((line) => {
             s.pause();
@@ -72,12 +194,29 @@ function parseFirewall(configFile){
     })
 }
 
+/**
+ * Results from a parsed line
+ * @typedef {Object} fwcLine
+ * @property {number} h - Hierarchy of the line
+ * @property {string} k - Key of the fwcConfig object
+ * @property {string} sk - SubKey of the fwcConfig object (when applicable)
+ * @property {Object} v - Value resulting from the parsing process
+ */
 
-function parseLine(type, line, parents, aceNumber){
+/**
+ * Parses a firewall line by inspecting the line and its parents
+ * @param {string} TYPE - The firewall parsing codename
+ * @param {string} LINE - The configuration line stream
+ * @param {string[]} PARENTS - A list of all the parents in order of hierarchy
+ * @param {string} ACENUMBER - The ACE number (Rule processing order)
+ * 
+ * @returns {fwcLine} An object containing hierarchy, key, subkey and value
+ */
+function parseLine(TYPE, LINE, PARENTS, ACENUMBER){
     // returns {h:hierarcy, k:key, sk:subkey, v:value}
-    aceNumber = aceNumber || 0
-    if (type == 'cisco-asa'){
-        config = cisco.typedParseLine(line, parents, aceNumber)
+    ACENUMBER = ACENUMBER || 0
+    if (TYPE == 'cisco-asa'){
+        config = cisco.typedParseLine(LINE, PARENTS, ACENUMBER)
         return {h:config.h, k:config.k, sk:config.sk, v:config.v}
     }
     else {throw 'No valid Firewall type detected'}
@@ -104,7 +243,7 @@ function selectObject(CONFIG,OBJECTNAME){
 
 /**
  * Retrieves a list of objects from the parsed config
- * @param {object} CONFIG - Config JSON obtained from parsing the config file
+ * @param {fwConfig} CONFIG - Config JSON obtained from parsing the config file
  * @param {string} KEY - Key to retreive, choose [objects|objectgroups|routes|interfaces|users|notparsed]
  * @param {number} [PERPAGE] - Amount of objects per page or ALL (default)
  * @param {number} [PAGE] - Page number. By default retrieves 1st page
@@ -112,12 +251,12 @@ function selectObject(CONFIG,OBJECTNAME){
  * @returns {object} Paged list of items of the selected key
  */
 function listItems(CONFIG,KEY,PERPAGE,PAGE){
-    PAGE = PAGE || 1
-    PERPAGE = PERPAGE || 'ALL'
-
     // if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {return {error:'Invalid Key'}}
     if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {throw new Error('Invalid Key')}
-
+    
+    PAGE = PAGE || 1
+    PERPAGE = PERPAGE || 'ALL'
+    
     if (PERPAGE > CONFIG[KEY].length) {PERPAGE = 'ALL'}
 
     total    = CONFIG[KEY].length
@@ -133,11 +272,40 @@ function listItems(CONFIG,KEY,PERPAGE,PAGE){
     }
 }
 
+/**
+ * Retrieves a list of rules from the parsed config
+ * @param {fwConfig} CONFIG - Config JSON obtained from parsing the config file
+ * @param {string} LIST - Select the list of rules, choose [nat|filter]
+ * @param {number} [PERPAGE] - Amount of objects per page or ALL (default)
+ * @param {number} [PAGE] - Page number. By default retrieves 1st page
+ * 
+ * @returns {object} Paged list of rules of the selected list
+ */
+function listRules(CONFIG,LIST,PERPAGE,PAGE,MATCH){
+    if (!(/nat|filter/.test(LIST))) {throw new Error('Invalid rule set')}
+
+    PAGE = PAGE || 1
+    PERPAGE = PERPAGE || 'ALL'
+    
+    if (PERPAGE > CONFIG.rules[LIST].length) {PERPAGE = 'ALL'}
+
+    total    = CONFIG.rules[LIST].length
+    pages    = (PERPAGE === 'ALL') ? 1 : Math.ceil(total/PERPAGE)
+    pagesize = (PERPAGE === 'ALL') ? total : PERPAGE
+    if (PAGE > pages) {PAGE = pages}
+
+    start    = (PERPAGE === 'ALL') ? 0 : PERPAGE*(PAGE-1)
+    end      = (PERPAGE === 'ALL') ? total : PERPAGE*(PAGE)
+    return {
+        size:{items:total, pages:pages, page:PAGE, pagesize:pagesize},
+        list:CONFIG.rules[LIST].slice(start,end)
+    }
+}
 
 /**
  * Retrieves details of a given item.
  * 
- * @param {object} CONFIG - Config JSON obtained from parsing the config file
+ * @param {fwConfig} CONFIG - Config JSON obtained from parsing the config file
  * @param {string} KEY - Key to retreive, choose [objects|objectgroups|interfaces|users]
  * @param {string} ID - ID for the item
  * 
