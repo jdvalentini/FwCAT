@@ -18,17 +18,16 @@ app.use(bodyParser.json());
 
 // Waits for POST request with the config file path --> data: {cmd:"parseCfg", cfgFile:"/path/to/file.cfg"}
 app.post('/', function(req, res){
-    console.log('POST /');
-    console.dir(req.body);
+    log.silly('POST /');
     if (req.body.cmd == 'parseCfg'){
         cfg = parser.parseFirewall(req.body.cfgFile)
         cfg.then(config =>{
-            res.writeHead(200, {'Content-Type': 'text/json'});
+            res.writeHead(200, {'Content-Type': 'application/json'});
             setupListeners(config)
-            res.end(JSON.stringify({status:'ready'}, null, 2) + '\r\n');
+            res.end(JSON.stringify({status:'ready'}, null, 2));
         })
     } else {
-        res.writeHead(418, {'Content-Type': 'text/json'});      // I'm a teapot! ;)
+        res.writeHead(418, {'Content-Type': 'application/json'});      // I'm a teapot! ;)
         res.end(JSON.stringify({error:'Command is not valid'}));
     }
 });
@@ -42,19 +41,19 @@ function setupListeners(configJSON){
      */
     app.get('/selectitem', function(req, res){
         if (req.query.id === undefined || req.query.key === undefined) {
-            res.writeHead(400, {'Content-Type': 'text/json'})
-            res.end(JSON.stringify({error:'ID missing'}));
+            res.writeHead(400, {'Content-Type': 'application/json'})
+            res.end(JSON.stringify({error:'ID or key missing'}));
         }
         else {
             log.silly('GET /object : ' + JSON.stringify(req.query))
             try {
                 var json = parser.selectItem(configJSON,req.query.key,req.query.id)
-                res.writeHead(200, {'Content-Type': 'text/json'});
-                res.end(JSON.stringify(json, null, 2) + '\r\n');
+                res.writeHead(200, {'Content-Type': 'application/json'});
+                res.end(JSON.stringify(json, null, 2));
             }
             catch(error){
-                res.writeHead(500, {'Content-Type': 'text/json'})
-                res.end(JSON.stringify({error:error.message}) + '\r\n');
+                res.writeHead(500, {'Content-Type': 'application/json'})
+                res.end(JSON.stringify({error:error.message}));
             }
         }
     });
@@ -67,7 +66,7 @@ function setupListeners(configJSON){
      */
     app.get('/listitems', function(req, res){
         if (req.query.key === undefined) {
-            res.writeHead(400, {'Content-Type': 'text/json'})
+            res.writeHead(400, {'Content-Type': 'application/json'})
             res.end(JSON.stringify({error:'Key missing'}));
         }
         else {
@@ -76,18 +75,76 @@ function setupListeners(configJSON){
             page = req.query.page || 1
             try {
                 var json = parser.listItems(configJSON, req.query.key, perPage, page)
-                res.writeHead(200, {'Content-Type': 'text/json'});
-                res.end(JSON.stringify(json, null, 2) + '\r\n');
+                res.writeHead(200, {
+                    'Content-Type': 'application/json',
+                    'FwCAT-items': json.size.items,
+                    'FwCAT-pages': json.size.pages,
+                    'FwCAT-page': json.size.page,
+                    'FwCAT-pagesize': json.size.pagesize,
+                });
+                res.end(JSON.stringify({list:json.list}, null, 2));
             }
             catch(error) {
-                res.writeHead(500, {'Content-Type': 'text/json'})
-                res.end(JSON.stringify({error:error.message}) + '\r\n');
+                res.writeHead(500, {'Content-Type': 'application/json'})
+                res.end(JSON.stringify({error:error.message}));
             }
         }
     });
+
+    app.get('/listrules/:key', function(req, res){
+        if (req.params.key === undefined) {
+            res.writeHead(400, {'Content-Type': 'application/json'})
+            res.end(JSON.stringify({error:'Key missing'}));
+        }
+        else {
+            log.silly('GET /listrules/<key> : ' + JSON.stringify(req.query))
+            perPage = req.query.per_page || 'ALL'
+            page = req.query.page || 1
+            try {
+                var json = parser.listRules(configJSON, req.params.key, perPage, page)
+                res.writeHead(200, {
+                    'Content-Type': 'application/json',
+                    'FwCAT-items': json.size.items,
+                    'FwCAT-pages': json.size.pages,
+                    'FwCAT-page': json.size.page,
+                    'FwCAT-pagesize': json.size.pagesize,
+                });
+                res.end(JSON.stringify({list:json.list}, null, 2));
+            }
+            catch(error) {
+                res.writeHead(500, {'Content-Type': 'application/json'})
+                res.end(JSON.stringify({error:error.message}));
+            }
+        }
+    });
+
+    app.get('/hostdata', function(req, res){
+        log.silly('GET /hostdata')
+        if (!('host' in configJSON) || !('fwType' in configJSON.host)){
+            res.writeHead(500, {'Content-Type': 'application/json'})
+            res.end(JSON.stringify({error:'The parser was unable to retrieve host data'}));
+        }
+        else {
+            res.writeHead(200, {'Content-Type': 'application/json'});
+            res.end(JSON.stringify({host:configJSON.host}, null, 2));
+        }
+    });
+
+    app.get('*', function(req,res){
+        res.writeHead(404, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify({error:'Ooops... nothing here'}))
+    })
 }
 
 
-port = 3000;
-app.listen(port);
-console.log('Listening at http://localhost:' + port)
+// port = 3000;
+// server = app.listen(port);
+// console.log('Listening at http://localhost:' + port)
+// module.exports = server
+
+var server = app.listen(3000, function () {
+    var port = server.address().port;
+    log.silly('API listening at http://localhost:%s', port);
+});
+
+module.exports = server;
