@@ -16,11 +16,11 @@ describe('Parse configuration file: Cisco ASA 9.8', ()=> {
         parser.parseFirewall(configFile).then(data =>{
             assert.equal(data.interfaces.length, 3)
             assert.equal(data.interfaces[0].ip, '10.0.0.1/26')
-            assert.equal(data.interfaces[0]['security-level'], '100')
+            assert.equal(data.interfaces[0]['securitylevel'], '100')
         })
     })
 
-    it('Understands objects', () => {
+    it('Understands objects and object groups', () => {
         parser.parseFirewall(configFile).then(data =>{
             assert.equal(data.objects.length,2)
             assert.equal(parser.selectObject(data,'OBJNETWORK')[0].address, '192.168.0.1')
@@ -50,7 +50,7 @@ describe('Parse configuration file: Cisco ASA 9.8', ()=> {
             assert.equal(data.interfaces[1].dns[0], '10.0.1.1')
             assert.equal(data.interfaces[1].dns[1], '10.0.1.2')
             assert.equal(data.interfaces[1].dns.length, 2)
-            assert.equal(data.interfaces[1].dnslookup, 'enabled')
+            assert.equal(data.interfaces[1].dnslookup, true)
             assert.equal(data.interfaces[2].dns[0], '8.8.8.8')
         })
     })

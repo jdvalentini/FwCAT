@@ -155,11 +155,13 @@ describe('Cisco Module: typedParseLine function',() => {
 
     it('Parses network object groups', () => {
         var result = parser.parseLine('cisco-asa', ' network-object object OBJ', ['object-group network GROUP'])
-        assert.equal(result.v.type, 'object')
+        assert.equal(result.sk, 'GROUP-network')
+        assert.equal(result.v.syntax, 'object')
         assert.equal(result.v.id, 'OBJ')
 
         var result = parser.parseLine('cisco-asa', ' network-object 10.0.0.0 255.0.0.0', ['object-group network GROUP'])
-        assert.equal(result.v.type, 'subnet')
+        assert.equal(result.sk, 'GROUP-network')
+        assert.equal(result.v.syntax, 'subnet')
         assert.equal(result.v.address, '10.0.0.0/8')
     })
 
@@ -167,10 +169,12 @@ describe('Cisco Module: typedParseLine function',() => {
         var result = parser.parseLine('cisco-asa', ' service-object tcp destination eq 123', ['object-group service GROUP'])
         assert.equal(result.v.protocol, 'tcp')
         assert.equal(result.v.destination, '123')
-        assert.equal(result.v.type, 'ports')
+        assert.equal(result.sk, 'GROUP-service')
+        assert.equal(result.v.syntax, 'ports')
 
         var result = parser.parseLine('cisco-asa', ' description Service group description', ['object-group service GROUP'])
-        assert.equal(result.v.type, 'description')
+        assert.equal(result.sk, 'GROUP-service')
+        assert.equal(result.v.syntax, 'description')
         assert.equal(result.v.description, 'Service group description')
     })
 
