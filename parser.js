@@ -306,16 +306,19 @@ function listItems(CONFIG,KEY,PERPAGE,PAGE){
  * @param {string} LIST - Select the list of rules, choose [nat|filter]
  * @param {number} [PERPAGE] - Amount of objects per page or ALL (default)
  * @param {number} [PAGE] - Page number. By default retrieves 1st page
+ * @param {string[]} [MATCH] - Return only objects matching MATCH[0] = MATCH[1] (MATCH is a 2 items array)
+ * @param {boolean} [ISREGEX] - Is match value a regex? otherwise string
  * 
  * @returns {object} Paged list of rules of the selected list
  */
-function listRules(CONFIG,LIST,PERPAGE,PAGE,MATCH){
+function listRules(CONFIG,LIST,PERPAGE,PAGE,MATCH,ISREGEX){
     if (!(/nat|filter/.test(LIST))) {throw new Error('Invalid rule set')}
 
     if (MATCH !== undefined){
-        if (!(Array.isArray(MATCH)) || MATCH.lengt !== 2) {throw new Error('Invalid match array')}
+        if (!(Array.isArray(MATCH)) || MATCH.length !== 2) {throw new Error('Invalid match array')}
         var matchedList = CONFIG.rules[LIST].filter((ENTRY) => {
-            return ENTRY[MATCH[0]] == MATCH[1]
+            if (ISREGEX) return new RegExp(MATCH[1]).test(ENTRY[MATCH[0]])
+            else return ENTRY[MATCH[0]] == MATCH[1]
         })
     }
     else {var matchedList = CONFIG.rules[LIST]}

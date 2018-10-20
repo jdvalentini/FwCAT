@@ -100,8 +100,12 @@ function setupListeners(configJSON){
             log.silly('GET /listrules/<key> : ' + JSON.stringify(req.query))
             perPage = req.query.per_page || 'ALL'
             page = req.query.page || 1
+            if (req.query.match_key !== undefined && req.query.match_value !== undefined){
+                var queryMatch = [req.query.match_key,req.query.match_value]
+            }
+            if (req.query.regex !== undefined) {var isRegEx = true}
             try {
-                var json = parser.listRules(configJSON, req.params.key, perPage, page)
+                var json = parser.listRules(configJSON, req.params.key, perPage, page, queryMatch, isRegEx)
                 res.writeHead(200, {
                     'Content-Type': 'application/json',
                     'FwCAT-items': json.size.items,
