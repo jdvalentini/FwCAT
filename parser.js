@@ -1,3 +1,11 @@
+/**
+ * @overview FwCAT: Firewall Configuration Assessment Tool
+ * @author Jorge Valentini <jdval@protonmail.com>
+ * @author Esteban Panelli <https://github.com/estebanpanelli>
+ * @license GPL-3.0-or-later
+ * @version 0.8
+ */
+
 const log = require('electron-log');
 const cisco = require(__dirname + '/lib/parser-cisco.js')
 

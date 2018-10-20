@@ -26,7 +26,15 @@
     
     <section>
         <article>
-            <pre class="prettyprint source linenums"><code>const log = require('electron-log');
+            <pre class="prettyprint source linenums"><code>/**
+ * @overview FwCAT: Firewall Configuration Assessment Tool
+ * @author Jorge Valentini &lt;jdval@protonmail.com>
+ * @author Esteban Panelly &lt;https://github.com/estebanpanelli>
+ * @license GPL-3.0-or-later
+ * @version 0.8
+ */
+
+const log = require('electron-log');
 const cisco = require(__dirname + '/lib/parser-cisco.js')
 
 log.transports.console.level = false;
@@ -137,8 +145,8 @@ log.transports.file.level = 'info';
  * @property {fwcNAT[]} rules.nat - List of NAT rules.
  * @property {fwcFilter[]} rules.filter - List of filter rules.
  * @property {fwcRoute[]} routes - List of routes.
- * @property {fwcObjects[]} objects - List of objects.
- * @property {fwcObjectgroups[]} objectgroups - List of objectgroups.
+ * @property {fwcObject[]} objects - List of objects.
+ * @property {fwcObjectgroup[]} objectgroups - List of objectgroups.
  * @property {string[]} notparsed - List of lines that could not be parsed.
  * 
  */
@@ -151,17 +159,28 @@ module.exports = {
     selectObject: selectObject,
     listItems: listItems,
     selectItem: selectItem,
+    listRules: listRules,
 }
 
-function detectType(configFile){
+/**
+ * Detects the type of a of a firewall by inspecting its configuration file
+ * @param {string} CONFIGFILE - Full path to the configuration file
+ * 
+ * @returns {string} Firewall parsing routinge codename
+ */
+function detectType(CONFIGFILE){
     // This function will eventually autodetect the firewall type - DEVELOPEMENT PENDING
     return('cisco-asa')
 }
 
-function parseFirewall(configFile){
+/**
+ * Parses a firewall by inspecting its configuration file
+ * @param {string} CONFIGFILE - Full path to the configuration file
+ * 
+ * @returns {fwConfig} An object with the parsed configuration
+ */
+function parseFirewall(CONFIGFILE){
     const fs = require('fs')
-    // const util = require('util')
-    // const stream = require('stream')
     const es = require('event-stream')
 
     var lineNumber = 0;
@@ -180,9 +199,9 @@ function parseFirewall(configFile){
         objectgroups:[]     // CISCO ASA: Object Groups
     }
 
-    cfg.host.fwType = detectType(configFile)
+    cfg.host.fwType = detectType(CONFIGFILE)
     
-    return new Promise((resolve, reject) => { var s = fs.createReadStream(configFile)
+    return new Promise((resolve, reject) => { var s = fs.createReadStream(CONFIGFILE)
         .pipe(es.split())
         .pipe(es.mapSync((line) => {
             s.pause();
@@ -211,12 +230,29 @@ function parseFirewall(configFile){
     })
 }
 
+/**
+ * Results from a parsed line
+ * @typedef {Object} fwcLine
+ * @property {number} h - Hierarchy of the line
+ * @property {string} k - Key of the fwcConfig object
+ * @property {string} sk - SubKey of the fwcConfig object (when applicable)
+ * @property {Object} v - Value resulting from the parsing process
+ */
 
-function parseLine(type, line, parents, aceNumber){
+/**
+ * Parses a firewall line by inspecting the line and its parents
+ * @param {string} TYPE - The firewall parsing codename
+ * @param {string} LINE - The configuration line stream
+ * @param {string[]} PARENTS - A list of all the parents in order of hierarchy
+ * @param {string} ACENUMBER - The ACE number (Rule processing order)
+ * 
+ * @returns {fwcLine} An object containing hierarchy, key, subkey and value
+ */
+function parseLine(TYPE, LINE, PARENTS, ACENUMBER){
     // returns {h:hierarcy, k:key, sk:subkey, v:value}
-    aceNumber = aceNumber || 0
-    if (type == 'cisco-asa'){
-        config = cisco.typedParseLine(line, parents, aceNumber)
+    ACENUMBER = ACENUMBER || 0
+    if (TYPE == 'cisco-asa'){
+        config = cisco.typedParseLine(LINE, PARENTS, ACENUMBER)
         return {h:config.h, k:config.k, sk:config.sk, v:config.v}
     }
     else {throw 'No valid Firewall type detected'}
@@ -242,6 +278,49 @@ function selectObject(CONFIG,OBJECTNAME){
 }
 
 /**
+ * Paging Information
+ * @typedef {fwcPagingInfo}
+ * @property {number} items - Number of items present in the original list
+ * @property {number} pages - Pages resulting from splitting the list
+ * @property {number} page - Current returned page 
+ * @property {number} pagesize - Items displayed per page
+ */
+
+/**
+ * Paged results of a list
+ * @typedef {fwcPagedResults}
+ * @property {fwcPagingInfo} size - Number of items and resulting pages
+ * @property {Object[]} list - The sliced list of the requested length
+ */
+
+/**
+ * Retrieves a slice of a given list
+ * @param {Object[]} LIST - Config JSON obtained from parsing the config file
+ * @param {number} [PERPAGE] - Amount of objects per page or ALL (default)
+ * @param {number} [PAGE] - Page number. By default retrieves 1st page
+ * 
+ * @returns {fwcPagedResults} An object containing the paging information and a sliced list
+ */
+function listPager(LIST,PERPAGE,PAGE){
+    PAGE = PAGE || 1
+    PERPAGE = PERPAGE || 'ALL'
+    
+    if (PERPAGE > LIST.length) {PERPAGE = 'ALL'}
+
+    total    = LIST.length
+    pages    = (PERPAGE === 'ALL') ? 1 : Math.ceil(total/PERPAGE)
+    pagesize = (PERPAGE === 'ALL') ? total : PERPAGE
+    if (PAGE > pages) {PAGE = pages}
+
+    start    = (PERPAGE === 'ALL') ? 0 : PERPAGE*(PAGE-1)
+    end      = (PERPAGE === 'ALL') ? total : PERPAGE*(PAGE)
+
+    return {
+        size:{items:total, pages:pages, page:PAGE, pagesize:pagesize},
+        list:LIST.slice(start,end)
+    }
+}
+/**
  * Retrieves a list of objects from the parsed config
  * @param {fwConfig} CONFIG - Config JSON obtained from parsing the config file
  * @param {string} KEY - Key to retreive, choose [objects|objectgroups|routes|interfaces|users|notparsed]
@@ -251,27 +330,37 @@ function selectObject(CONFIG,OBJECTNAME){
  * @returns {object} Paged list of items of the selected key
  */
 function listItems(CONFIG,KEY,PERPAGE,PAGE){
-    PAGE = PAGE || 1
-    PERPAGE = PERPAGE || 'ALL'
-
     // if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {return {error:'Invalid Key'}}
     if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {throw new Error('Invalid Key')}
-
-    if (PERPAGE > CONFIG[KEY].length) {PERPAGE = 'ALL'}
-
-    total    = CONFIG[KEY].length
-    pages    = (PERPAGE === 'ALL') ? 1 : Math.ceil(total/PERPAGE)
-    pagesize = (PERPAGE === 'ALL') ? total : PERPAGE
-    if (PAGE > pages) {PAGE = pages}
-
-    start    = (PERPAGE === 'ALL') ? 0 : PERPAGE*(PAGE-1)
-    end      = (PERPAGE === 'ALL') ? total : PERPAGE*(PAGE)
-    return {
-        size:{items:total, pages:pages, page:PAGE, pagesize:pagesize},
-        list:CONFIG[KEY].slice(start,end)
-    }
+    
+    return listPager(CONFIG[KEY],PERPAGE,PAGE)
 }
 
+/**
+ * Retrieves a list of rules from the parsed config
+ * @param {fwConfig} CONFIG - Config JSON obtained from parsing the config file
+ * @param {string} LIST - Select the list of rules, choose [nat|filter]
+ * @param {number} [PERPAGE] - Amount of objects per page or ALL (default)
+ * @param {number} [PAGE] - Page number. By default retrieves 1st page
+ * @param {string[]} [MATCH] - Return only objects matching MATCH[0] = MATCH[1] (MATCH is a 2 items array)
+ * @param {boolean} [ISREGEX] - Is match value a regex? otherwise string
+ * 
+ * @returns {object} Paged list of rules of the selected list
+ */
+function listRules(CONFIG,LIST,PERPAGE,PAGE,MATCH,ISREGEX){
+    if (!(/nat|filter/.test(LIST))) {throw new Error('Invalid rule set')}
+
+    if (MATCH !== undefined){
+        if (!(Array.isArray(MATCH)) || MATCH.length !== 2) {throw new Error('Invalid match array')}
+        var matchedList = CONFIG.rules[LIST].filter((ENTRY) => {
+            if (ISREGEX) return new RegExp(MATCH[1]).test(ENTRY[MATCH[0]])
+            else return ENTRY[MATCH[0]] == MATCH[1]
+        })
+    }
+    else {var matchedList = CONFIG.rules[LIST]}
+
+    return listPager(matchedList,PERPAGE,PAGE)
+}
 
 /**
  * Retrieves details of a given item.
@@ -299,13 +388,13 @@ function selectItem(CONFIG,KEY,ID){
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#listItems">listItems</a></li><li><a href="global.html#selectItem">selectItem</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#detectType">detectType</a></li><li><a href="global.html#ip2cidr">ip2cidr</a></li><li><a href="global.html#isIPv4">isIPv4</a></li><li><a href="global.html#isIPv6">isIPv6</a></li><li><a href="global.html#listItems">listItems</a></li><li><a href="global.html#listPager">listPager</a></li><li><a href="global.html#listRules">listRules</a></li><li><a href="global.html#mask2cidr">mask2cidr</a></li><li><a href="global.html#parseFirewall">parseFirewall</a></li><li><a href="global.html#parseLine">parseLine</a></li><li><a href="global.html#selectItem">selectItem</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.5</a> on Fri Oct 19 2018 15:08:02 GMT-0400 (EDT)
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.5.5</a> on Sat Oct 20 2018 13:23:27 GMT-0400 (EDT)
 </footer>
 
 <script> prettyPrint(); </script>
