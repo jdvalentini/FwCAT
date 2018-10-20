@@ -242,6 +242,49 @@ function selectObject(CONFIG,OBJECTNAME){
 }
 
 /**
+ * Paging Information
+ * @typedef {fwcPagingInfo}
+ * @property {number} items - Number of items present in the original list
+ * @property {number} pages - Pages resulting from splitting the list
+ * @property {number} page - Current returned page 
+ * @property {number} pagesize - Items displayed per page
+ */
+
+/**
+ * Paged results of a list
+ * @typedef {fwcPagedResults}
+ * @property {fwcPagingInfo} size - Number of items and resulting pages
+ * @property {Object[]} list - The sliced list of the requested length
+ */
+
+/**
+ * Retrieves a slice of a given list
+ * @param {Object[]} LIST - Config JSON obtained from parsing the config file
+ * @param {number} [PERPAGE] - Amount of objects per page or ALL (default)
+ * @param {number} [PAGE] - Page number. By default retrieves 1st page
+ * 
+ * @returns {fwcPagedResults} An object containing the paging information and a sliced list
+ */
+function listPager(LIST,PERPAGE,PAGE){
+    PAGE = PAGE || 1
+    PERPAGE = PERPAGE || 'ALL'
+    
+    if (PERPAGE > LIST.length) {PERPAGE = 'ALL'}
+
+    total    = LIST.length
+    pages    = (PERPAGE === 'ALL') ? 1 : Math.ceil(total/PERPAGE)
+    pagesize = (PERPAGE === 'ALL') ? total : PERPAGE
+    if (PAGE > pages) {PAGE = pages}
+
+    start    = (PERPAGE === 'ALL') ? 0 : PERPAGE*(PAGE-1)
+    end      = (PERPAGE === 'ALL') ? total : PERPAGE*(PAGE)
+
+    return {
+        size:{items:total, pages:pages, page:PAGE, pagesize:pagesize},
+        list:LIST.slice(start,end)
+    }
+}
+/**
  * Retrieves a list of objects from the parsed config
  * @param {fwConfig} CONFIG - Config JSON obtained from parsing the config file
  * @param {string} KEY - Key to retreive, choose [objects|objectgroups|routes|interfaces|users|notparsed]
@@ -254,22 +297,7 @@ function listItems(CONFIG,KEY,PERPAGE,PAGE){
     // if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {return {error:'Invalid Key'}}
     if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {throw new Error('Invalid Key')}
     
-    PAGE = PAGE || 1
-    PERPAGE = PERPAGE || 'ALL'
-    
-    if (PERPAGE > CONFIG[KEY].length) {PERPAGE = 'ALL'}
-
-    total    = CONFIG[KEY].length
-    pages    = (PERPAGE === 'ALL') ? 1 : Math.ceil(total/PERPAGE)
-    pagesize = (PERPAGE === 'ALL') ? total : PERPAGE
-    if (PAGE > pages) {PAGE = pages}
-
-    start    = (PERPAGE === 'ALL') ? 0 : PERPAGE*(PAGE-1)
-    end      = (PERPAGE === 'ALL') ? total : PERPAGE*(PAGE)
-    return {
-        size:{items:total, pages:pages, page:PAGE, pagesize:pagesize},
-        list:CONFIG[KEY].slice(start,end)
-    }
+    return listPager(CONFIG[KEY],PERPAGE,PAGE)
 }
 
 /**
@@ -284,22 +312,15 @@ function listItems(CONFIG,KEY,PERPAGE,PAGE){
 function listRules(CONFIG,LIST,PERPAGE,PAGE,MATCH){
     if (!(/nat|filter/.test(LIST))) {throw new Error('Invalid rule set')}
 
-    PAGE = PAGE || 1
-    PERPAGE = PERPAGE || 'ALL'
-    
-    if (PERPAGE > CONFIG.rules[LIST].length) {PERPAGE = 'ALL'}
-
-    total    = CONFIG.rules[LIST].length
-    pages    = (PERPAGE === 'ALL') ? 1 : Math.ceil(total/PERPAGE)
-    pagesize = (PERPAGE === 'ALL') ? total : PERPAGE
-    if (PAGE > pages) {PAGE = pages}
-
-    start    = (PERPAGE === 'ALL') ? 0 : PERPAGE*(PAGE-1)
-    end      = (PERPAGE === 'ALL') ? total : PERPAGE*(PAGE)
-    return {
-        size:{items:total, pages:pages, page:PAGE, pagesize:pagesize},
-        list:CONFIG.rules[LIST].slice(start,end)
+    if (MATCH !== undefined){
+        if (!(Array.isArray(MATCH)) || MATCH.lengt !== 2) {throw new Error('Invalid match array')}
+        var matchedList = CONFIG.rules[LIST].filter((ENTRY) => {
+            return ENTRY[MATCH[0]] == MATCH[1]
+        })
     }
+    else {var matchedList = CONFIG.rules[LIST]}
+
+    return listPager(matchedList,PERPAGE,PAGE)
 }
 
 /**
