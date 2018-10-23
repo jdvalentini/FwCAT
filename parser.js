@@ -120,7 +120,13 @@ log.transports.file.level = 'info';
  * @property {fwcObject[]} objects - List of objects.
  * @property {fwcObjectgroup[]} objectgroups - List of objectgroups.
  * @property {string[]} notparsed - List of lines that could not be parsed.
- * 
+ */
+
+/**
+ * Output from interpreting parser results
+ * @typedef {Object} fwcResults
+ * @property {fwConfig} cfg - The current status of the config object
+ * @property {string[]} parents - A list of all the parents in order of hierarchy
  */
 
 module.exports = {
@@ -251,7 +257,7 @@ function selectObject(CONFIG,OBJECTNAME){
 
 /**
  * Paging Information
- * @typedef {fwcPagingInfo}
+ * @typedef {Object} fwcPagingInfo
  * @property {number} items - Number of items present in the original list
  * @property {number} pages - Pages resulting from splitting the list
  * @property {number} page - Current returned page 
@@ -260,7 +266,7 @@ function selectObject(CONFIG,OBJECTNAME){
 
 /**
  * Paged results of a list
- * @typedef {fwcPagedResults}
+ * @typedef {Object} fwcPagedResults
  * @property {fwcPagingInfo} size - Number of items and resulting pages
  * @property {Object[]} list - The sliced list of the requested length
  */
@@ -273,7 +279,7 @@ function selectObject(CONFIG,OBJECTNAME){
  * 
  * @returns {fwcPagedResults} An object containing the paging information and a sliced list
  */
-function listPager(LIST,PERPAGE,PAGE){
+function splitPages(LIST,PERPAGE,PAGE){
     PAGE = PAGE || 1
     PERPAGE = PERPAGE || 'ALL'
     
@@ -305,7 +311,7 @@ function listItems(CONFIG,KEY,PERPAGE,PAGE){
     // if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {return {error:'Invalid Key'}}
     if (!(/objects|objectgroups|routes|interfaces|users|notparsed/.test(KEY))) {throw new Error('Invalid Key')}
     
-    return listPager(CONFIG[KEY],PERPAGE,PAGE)
+    return splitPages(CONFIG[KEY],PERPAGE,PAGE)
 }
 
 /**
@@ -331,7 +337,7 @@ function listRules(CONFIG,LIST,PERPAGE,PAGE,MATCH,ISREGEX){
     }
     else {var matchedList = CONFIG.rules[LIST]}
 
-    return listPager(matchedList,PERPAGE,PAGE)
+    return splitPages(matchedList,PERPAGE,PAGE)
 }
 
 /**

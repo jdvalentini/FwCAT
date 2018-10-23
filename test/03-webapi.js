@@ -17,8 +17,6 @@ describe('WEB API: Parses config file upon proper requests', function () {
         .post('/')
         .type('form')
         .send({cmd:"parseCfg", cfgFile: __dirname + "/cfg-cisco-asa98-01.cfg"})
-        // .set('Accept', /application\/json/)
-        // .expect(200)
         .expect(200)
         .expect("Content-type",/json/)
         .expect(JSON.stringify({status:'ready'},null,2))

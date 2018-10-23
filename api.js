@@ -5,6 +5,37 @@
  * @version 0.1
  */
 
+
+
+/**
+ * @api {get} /hostdata Host information on the firewall (hostname, model, serial, etc.)
+ * @apiVersion 0.1.0
+ * @apiName GetHostData
+ * @apiGroup FwCAT
+ * 
+ * @apiSuccess {String} fwType Firewall parsing syntax.
+ * @apiSuccess {String} serial Serial Number.
+ * @apiSuccess {String} model Firewall model.
+ * @apiSuccess {String} hostname Host Name.
+ * @apiSuccess {String} domainname Firewall domain.
+ *
+ * @apiSuccessExample Success-Response:
+ *     HTTP/1.1 200 OK
+ *     {
+ *       "fwType": "cisco-asa",
+ *       "model": "ASA5545",
+ *       "hostname": "ASATEST"
+ *     }
+ *
+ * @apiError (Error 5xx) HostNotFound The host data is not present in the parsed results or the firewall has not been parsed
+ *
+ * @apiErrorExample Error-Response:
+ *     HTTP/1.1 500 Not Found
+ *     {
+ *       "error": "The parser was unable to retrieve host data"
+ *     }
+ */
+
 const parser = require(__dirname + '/parser.js')
 const log = require('electron-log')
 const express = require('express');
