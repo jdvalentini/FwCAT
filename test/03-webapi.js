@@ -6,15 +6,15 @@ const assert = require('assert');
 describe('WEB API: Parses config file upon proper requests', function () {
     var server = require('../api.js');
 
-    it('Returns 418 if POST / command is not understood', function testSlash(done) {
+    it('Returns 418 if POST /parse command is not understood', function testSlash(done) {
         request(server)
-        .post('/')
+        .post('/parse')
         .expect(418, done);
     });
 
-    it('Returns 200 if POST / command is parseCfg and gives a file', function testSlash(done) {
+    it('Returns 200 if POST /parse command is parseCfg and gives a file', function testSlash(done) {
         request(server)
-        .post('/')
+        .post('/parse')
         .type('form')
         .send({cmd:"parseCfg", cfgFile: __dirname + "/cfg-cisco-asa98-01.cfg"})
         .expect(200)
