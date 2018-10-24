@@ -1,7 +1,42 @@
 const parser = require('../parser.js');
 const assert = require('assert');
 
-describe('Parse configuration file: Cisco ASA 9.8', ()=> {
+describe('Parser: Detect firewall type (for parsing syntax)', () => {
+    var configCisco1 = __dirname + '/cfg-cisco-asa98-01.cfg'
+    var configCisco2 = __dirname + '/cfg-cisco-asa87-01.cfg'
+    var configUnknown1 = __dirname + '/cfg-unknown-file-01.cfg'
+    var configUnknown2 = __dirname + '/cfg-unknown-file-02.cfg'
+
+    it('Returns parsing syntax of different firewall models', () => {
+        parser.detectType(configCisco1).then(FWTYPE => {
+            assert.equal(FWTYPE,'cisco-asa')
+        })
+    })
+
+    it('Throws an error if the detected firewall is unsupported', () => {
+        parser.detectType(configCisco2).then(FWTYPE => {
+            throw new Error('It was not expected to resolve...')
+        }).catch((err) => {
+            assert.equal(err,'Unsupported Cisco ASA version')
+        })
+    })
+
+    it('Throws an error if the firewall type cannot be detected', () => {
+        parser.detectType(configUnknown1).then(FWTYPE => {
+            throw new Error('It was not expected to resolve...')
+        }).catch((err) => {
+            assert.equal(err,'Could not detect model in the first 50 lines')
+        })
+
+        parser.detectType(configUnknown2).then(FWTYPE => {
+            throw new Error('It was not expected to resolve...')
+        }).catch((err) => {
+            assert.equal(err,'Finished reading file ' + configUnknown2 + ' and no type was detected')
+        })
+    })
+})
+
+describe('Parse configuration file: Cisco ASA 9.8', () => {
     var configFile = __dirname + '/cfg-cisco-asa98-01.cfg'
     it('Understands host parameters', () => {
         parser.parseFirewall(configFile).then(data =>{

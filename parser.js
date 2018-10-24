@@ -138,28 +138,69 @@ module.exports = {
     listItems: listItems,
     selectItem: selectItem,
     listRules: listRules,
+    detectType: detectType,
 }
 
 /**
  * Detects the type of a of a firewall by inspecting its configuration file
  * @param {string} CONFIGFILE - Full path to the configuration file
  * 
- * @returns {string} Firewall parsing routinge codename
+ * @returns {string} Firewall parsing routing codename
  */
 function detectType(CONFIGFILE){
     // This function will eventually autodetect the firewall type - DEVELOPEMENT PENDING
-    return('cisco-asa')
+    const fs = require('fs')
+    const es = require('event-stream')
+    var readLines = 0
+    var type = ''
+    return new Promise((resolve,reject) => {
+        var s = fs.createReadStream(CONFIGFILE)
+        .pipe(es.split())
+        .pipe(es.mapSync((line) => {
+            s.pause();
+            if (readLines > 50) {throw new Error('Could not detect model in the first 50 lines')}
+            else {readLines += 1}
+
+            if ((r = /^ASA Version ([\d]+)\.([\d]+)/.exec(line)) !== null) {
+                var major = parseInt(r[1])
+                var minor = parseInt(r[2])
+                if (major > 9 || (major == 9 && minor >= 6)) {type = 'cisco-asa'}
+                else {throw new Error('Unsupported Cisco ASA version')}
+                s.destroy()
+            }
+
+            s.resume();
+            })
+            .on('error', function(err){
+                log.error('Error while reading file.', err);
+                reject(err.message)
+            })
+            .on('end', function(){
+                log.info('Read entire file: ' + readLines + ' lines.')
+                if (type == '') {reject('Finished reading file ' + CONFIGFILE + ' and no type was detected')}
+                else {resolve(type)}
+            })
+            .on('close', function(err){
+                log.info('Model detected as ' + type + ' when reading line ' + readLines)
+                resolve(type)
+            })
+        );
+    })
+    //
+    // return('cisco-asa')
 }
 
 /**
  * Parses a firewall by inspecting its configuration file
  * @param {string} CONFIGFILE - Full path to the configuration file
  * 
- * @returns {fwConfig} An object with the parsed configuration
+ * @returns {fwConfig} A promise for an object with the parsed configuration
  */
 function parseFirewall(CONFIGFILE){
     const fs = require('fs')
     const es = require('event-stream')
+
+    if (!(fs.existsSync(CONFIGFILE))) {return Promise.reject({message:'File does not exist'})}
 
     var lineNumber = 0;
     var parents = []        // Blockify array
@@ -177,23 +218,25 @@ function parseFirewall(CONFIGFILE){
         objectgroups:[]     // CISCO ASA: Object Groups
     }
 
-    cfg.host.fwType = detectType(CONFIGFILE)
-    
-    return new Promise((resolve, reject) => { var s = fs.createReadStream(CONFIGFILE)
-        .pipe(es.split())
-        .pipe(es.mapSync((line) => {
-            s.pause();
-
-            lineNumber += 1;
-            ACEnumber = cfg.rules.filter.length + 1
-
-            let {h, k, sk, v} = parseLine(cfg.host.fwType, line, parents, ACEnumber) // Gets hierarchy, key, subkey and value
-            if (cfg.host.fwType == 'cisco-asa') {
-                results = cisco.interpretResults(h, k, sk, v, cfg, lineNumber, line, parents)
-                cfg = results.cfg
-                parents = results.parents
+    // cfg.host.fwType = detectType(CONFIGFILE)
+    return detectType(CONFIGFILE).then(FWTYPE =>{
+        cfg.host.fwType = FWTYPE
+        
+        return new Promise((resolve, reject) => { var s = fs.createReadStream(CONFIGFILE)
+            .pipe(es.split())
+            .pipe(es.mapSync((line) => {
+                s.pause();
+                
+                lineNumber += 1;
+                ACEnumber = cfg.rules.filter.length + 1
+                
+                let {h, k, sk, v} = parseLine(cfg.host.fwType, line, parents, ACEnumber) // Gets hierarchy, key, subkey and value
+                if (cfg.host.fwType == 'cisco-asa') {
+                    results = cisco.interpretResults(h, k, sk, v, cfg, lineNumber, line, parents)
+                    cfg = results.cfg
+                    parents = results.parents
             }
-
+            
             s.resume();
             })
             .on('error', function(err){
@@ -204,8 +247,9 @@ function parseFirewall(CONFIGFILE){
                 log.info('Read entire file: ' + lineNumber + ' lines.')
                 resolve(cfg)
             })
-        );
-    })
+            );
+        })
+    }).catch(err => {return Promise.reject(err)})
 }
 
 /**
