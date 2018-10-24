@@ -241,7 +241,7 @@ define({ "api": [
             "type": "Boolean",
             "optional": true,
             "field": "regex",
-            "description": "<p>Specifies if the previous matching pair should be treated as a RegExp</p>"
+            "description": "<p>Specifies if the previous matching pair should be treated as a RegExp. In the example usage you can change match_value to <code>3?389</code> (URL encoded) and add <code>&amp;regex=1</code> to match 389 and 3389</p>"
           }
         ]
       }
