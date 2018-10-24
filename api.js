@@ -170,7 +170,7 @@
  * @apiParam {Number} [page=1] The page number. If larger than last page returns last page
  * @apiParam {String} [match_key] Bring only results with this key
  * @apiParam {String} [match_value] Bring only results where match_key matches this value
- * @apiParam {Boolean} [regex] Specifies if the previous matching pair should be treated as a RegExp
+ * @apiParam {Boolean} [regex] Specifies if the previous matching pair should be treated as a RegExp. In the example usage you can change match_value to <code>3?389</code> (URL encoded) and add <code>&regex=1</code> to match 389 and 3389
  *
  * @apiExample Example usage:
  *     curl -i -s 'http://localhost:3000/listrules/filter?per_page=10&page=1&match_key=dstPort&match_value=389'
@@ -225,6 +225,9 @@ app.post('/parse', function(req, res){
             res.writeHead(200, {'Content-Type': 'application/json'});
             setupListeners(config)
             res.end(JSON.stringify({status:'ready'}, null, 2));
+        }).catch(error => {
+            res.writeHead(500, {'Content-Type': 'application/json'})
+            res.end(JSON.stringify({error:error.message}));
         })
     } else {
         res.writeHead(418, {'Content-Type': 'application/json'});      // I'm a teapot! ;)
