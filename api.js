@@ -2,13 +2,39 @@
  * @overview Web API for firewal parsing.
  * @author Jorge Valentini <jdval@protonmail.com>
  * @license GPL-3.0-or-later
- * @version 0.1
+ * @version 0.1.0
  */
 
-
+/**
+ * @api {post} /parse Post command to parser
+ * @apiVersion 0.1.0
+ * @apiName PostParseCommand
+ * @apiGroup FwCAT
+ * 
+ * @apiParam {String="parseCfg"} cmd Command to send to endpoint
+ * @apiParam {String} cfgFile Full path to the configuration file to parse
+ * 
+ * @apiParamExample {json} Request-Example:
+ *     {     "cmd": "parseCfg",
+ *       "cfgFile": "/path/to/cisco.cfg" }
+ *
+ * @apiSuccessExample Success-Response:
+ *     HTTP/1.1 200 OK
+ *     {
+ *       "status": "ready"
+ *     }
+ *
+ * @apiError (Error 4xx) InvalidCommand cmd parameter is not valid
+ *
+ * @apiErrorExample Error-Response:
+ *     HTTP/1.1 418
+ *     {
+ *       "error": "Command is not valid"
+ *     }
+ */
 
 /**
- * @api {get} /hostdata Host information on the firewall (hostname, model, serial, etc.)
+ * @api {get} /hostdata Get firewall host information
  * @apiVersion 0.1.0
  * @apiName GetHostData
  * @apiGroup FwCAT
@@ -27,14 +53,136 @@
  *       "hostname": "ASATEST"
  *     }
  *
- * @apiError (Error 5xx) HostNotFound The host data is not present in the parsed results or the firewall has not been parsed
+ * @apiError (Error 5xx) HostNotParsed The host data is not present in the parsed results or the firewall has not been parsed
  *
  * @apiErrorExample Error-Response:
- *     HTTP/1.1 500 Not Found
+ *     HTTP/1.1 500
  *     {
  *       "error": "The parser was unable to retrieve host data"
  *     }
  */
+
+/**
+ * @api {get} /listitems List firewall properties
+ * @apiVersion 0.1.0
+ * @apiName GetListItems
+ * @apiGroup FwCAT
+ *
+ * @apiParam {String="objects","objectgroups","routes","interfaces","users","notparsed"} key Config property to retrieve
+ * @apiParam {Number} [per_page="ALL"] Split results in this amount of items per page. Use "ALL" for all
+ * @apiParam {Number} [page=1] The page number. If larger than last page returns last page
+ *
+ * @apiSuccess {Object[]} list List of objects for the requested property.
+ *
+ * @apiSuccessExample Success-Response:
+ *     HTTP/1.1 200 OK
+ *     Content-Type: application/json
+ *     FwCAT-items: 1
+ *     FwCAT-pages: 1
+ *     FwCAT-page: 1
+ *     FwCAT-pagesize: 1
+ *     {
+ *       "list": [Object1, Object2]
+ *     }
+ *
+ * @apiError KeyMissing No list key was found.
+ * @apiError (Error 5xx) ServerError Error was thrown from the parser
+ *
+ * @apiErrorExample Error-Response:
+ *     HTTP/1.1 400
+ *     {
+ *       "error": "'Key missing'"
+ *     }
+ * 
+ * @apiErrorExample Error-Response:
+ *     HTTP/1.1 500
+ *     {
+ *       "error": "Invalid key"
+ *     }
+ */
+
+/**
+ * @api {get} /selectitem Get information on an item
+ * @apiVersion 0.1.0
+ * @apiName GetSelectItem
+ * @apiGroup FwCAT
+ *
+ * @apiParam {String="objects","objectgroups","interfaces","users"} key Config property to retrieve
+ * @apiParam {String} id ID of the item to match
+ *
+ * @apiSuccess {Object[]} list List of objects matching the query.
+ *
+ * @apiSuccessExample Success-Response:
+ *     {
+ *       "item": Object
+ *     }
+ * 
+ * @apiSuccessExample Success-Response:
+ *     {
+ *       "item": Object1,
+ *       "warning": "Multiple items selected",
+ *       "others": [Object2, Object3]
+ *     }
+ *
+ * @apiError KeyOrIDMissing No list key was found or no ID was specified.
+ * @apiError (Error 5xx) ServerError Error was thrown from the parser
+ *
+ * @apiErrorExample Error-Response:
+ *     HTTP/1.1 400
+ *     {
+ *       "error": "ID or key missing"
+ *     }
+ * 
+ * @apiErrorExample Error-Response:
+ *     HTTP/1.1 500
+ *     {
+ *       "error": "Invalid key"
+ *     }
+ */
+
+ 
+/**
+ * @api {get} /listrules/:key List firewall rules
+ * @apiVersion 0.1.0
+ * @apiName GetListRules
+ * @apiGroup FwCAT
+ *
+ * @apiParam {String="filter","nat"} key ID of the set of rules
+ * @apiParam {Number} [per_page="ALL"] Split results in this amount of items per page. Use "ALL" for all
+ * @apiParam {Number} [page=1] The page number. If larger than last page returns last page
+ * @apiParam {String} [match_key] Bring only results with this key
+ * @apiParam {String} [match_value] Bring only results where match_key matches this value
+ * @apiParam {Boolean} [regex] Specifies if the previous matching pair should be treated as a RegExp
+ *
+ * @apiSuccess {Object[]} list List of objects matching the query.
+ *
+ * @apiSuccessExample Success-Response:
+ *     HTTP/1.1 200 OK
+ *     Content-Type: application/json
+ *     FwCAT-items: 1
+ *     FwCAT-pages: 1
+ *     FwCAT-page: 1
+ *     FwCAT-pagesize: 1
+ *     {
+ *       "list": [Object1, Object2]
+ *     }
+ *
+ * @apiError KeyMissing No list key was found.
+ * @apiError (Error 5xx) ServerError Error was thrown from the parser
+ *
+ * @apiErrorExample Error-Response:
+ *     HTTP/1.1 400
+ *     {
+ *       "error": "'Key missing'"
+ *     }
+ * 
+ * @apiErrorExample Error-Response:
+ *     HTTP/1.1 500
+ *     {
+ *       "error": "Invalid match array"
+ *     }
+ */
+
 
 const parser = require(__dirname + '/parser.js')
 const log = require('electron-log')
@@ -48,8 +196,8 @@ app.use(bodyParser.json());
 // app.use(express.static(path.join(__dirname, 'static')));
 
 // Waits for POST request with the config file path --> data: {cmd:"parseCfg", cfgFile:"/path/to/file.cfg"}
-app.post('/', function(req, res){
-    log.silly('POST /');
+app.post('/parse', function(req, res){
+    log.silly('POST /parse');
     if (req.body.cmd == 'parseCfg'){
         cfg = parser.parseFirewall(req.body.cfgFile)
         cfg.then(config =>{
@@ -76,7 +224,7 @@ function setupListeners(configJSON){
             res.end(JSON.stringify({error:'ID or key missing'}));
         }
         else {
-            log.silly('GET /object : ' + JSON.stringify(req.query))
+            log.silly('GET /selectitem : ' + JSON.stringify(req.query))
             try {
                 var json = parser.selectItem(configJSON,req.query.key,req.query.id)
                 res.writeHead(200, {'Content-Type': 'application/json'});
