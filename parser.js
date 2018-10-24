@@ -354,6 +354,6 @@ function selectItem(CONFIG,KEY,ID){
     selection = CONFIG[KEY].filter((OBJECTS) => {
         return OBJECTS.id === ID
     })
-    if (selection.length > 1) {return {warning:'Multiple items selected', item:selection[0], others:selection.slice(1)}}
+    if (selection.length > 1) {return {warning:'Multiple items selected', item:selection[0], all:selection}}
     else {return {item:selection[0]}}
 }

@@ -121,7 +121,7 @@
  *     {
  *       "item": Object1,
  *       "warning": "Multiple items selected",
- *       "others": [Object2, Object3]
+ *       "all": [Object2, Object3]
  *     }
  *
  * @apiError KeyOrIDMissing No list key was found or no ID was specified.
@@ -140,7 +140,7 @@
  *     }
  */
 
- 
+
 /**
  * @api {get} /listrules/:key List firewall rules
  * @apiVersion 0.1.0
