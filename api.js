@@ -336,11 +336,6 @@ function setupListeners(configJSON){
             res.end(JSON.stringify({host:configJSON.host}, null, 2));
         }
     });
-
-    app.get('*', function(req,res){
-        res.writeHead(404, {'Content-Type': 'application/json'});
-        res.end(JSON.stringify({error:'Ooops... nothing here'}))
-    })
 }
 
 
