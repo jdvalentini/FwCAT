@@ -10,6 +10,7 @@
  * @apiVersion 0.1.0
  * @apiName PostParseCommand
  * @apiGroup FwCAT
+ * @apiDescription Use this endpoint to parse a file and open the GET listeners serving the results.
  * 
  * @apiParam {String="parseCfg"} cmd Command to send to endpoint
  * @apiParam {String} cfgFile Full path to the configuration file to parse
@@ -17,6 +18,9 @@
  * @apiParamExample {json} Request-Example:
  *     {     "cmd": "parseCfg",
  *       "cfgFile": "/path/to/cisco.cfg" }
+ * 
+ * @apiExample Example usage:
+ *     curl -H "Content-Type: application/json" -d '{"cmd":"parseCfg", "cfgFile":"/path/to/cisco.cfg"}' http://localhost:3000/parse
  *
  * @apiSuccessExample Success-Response:
  *     HTTP/1.1 200 OK
@@ -34,15 +38,16 @@
  */
 
 /**
- * @api {get} /hostdata Get firewall host information
+ * @api {get} /hostdata Get firewall host data
  * @apiVersion 0.1.0
  * @apiName GetHostData
  * @apiGroup FwCAT
+ * @apiDescription After posting a file to parse, use this endpoint to get firewall host information.
  * 
  * @apiSuccess {String} fwType Firewall parsing syntax.
  * @apiSuccess {String} serial Serial Number.
  * @apiSuccess {String} model Firewall model.
- * @apiSuccess {String} hostname Host Name.
+ * @apiSuccess {String} hostname Host Name.o
  * @apiSuccess {String} domainname Firewall domain.
  *
  * @apiSuccessExample Success-Response:
@@ -67,11 +72,15 @@
  * @apiVersion 0.1.0
  * @apiName GetListItems
  * @apiGroup FwCAT
+ * @apiDescription After posting a file to parse, use this endpoint to list firewall properties.
  *
  * @apiParam {String="objects","objectgroups","routes","interfaces","users","notparsed"} key Config property to retrieve
  * @apiParam {Number} [per_page="ALL"] Split results in this amount of items per page. Use "ALL" for all
  * @apiParam {Number} [page=1] The page number. If larger than last page returns last page
  *
+ * @apiExample Example usage:
+ *     curl -i -s 'http://localhost:3000/listitems?key=routes&per_page=3&page=2'
+ * 
  * @apiSuccess {Object[]} list List of objects for the requested property.
  *
  * @apiSuccessExample Success-Response:
@@ -91,7 +100,7 @@
  * @apiErrorExample Error-Response:
  *     HTTP/1.1 400
  *     {
- *       "error": "'Key missing'"
+ *       "error": "Key missing"
  *     }
  * 
  * @apiErrorExample Error-Response:
@@ -106,11 +115,17 @@
  * @apiVersion 0.1.0
  * @apiName GetSelectItem
  * @apiGroup FwCAT
+ * @apiDescription After posting a file to parse, use this endpoint get details on a given item key and id.
  *
  * @apiParam {String="objects","objectgroups","interfaces","users"} key Config property to retrieve
  * @apiParam {String} id ID of the item to match
  *
- * @apiSuccess {Object[]} list List of objects matching the query.
+ * @apiExample Example usage:
+ *     curl -s 'http://localhost:3000/selectitem?key=interfaces&id=GigabitEthernet0/0'
+ * 
+ * @apiSuccess {Object} item Details on the first matching item (may be the only one).
+ * @apiSuccess {Object} [all] List of objects matching the query.
+ * @apiSuccess {String} [warning] Warns if there is something to pay attention to.
  *
  * @apiSuccessExample Success-Response:
  *     {
@@ -146,6 +161,9 @@
  * @apiVersion 0.1.0
  * @apiName GetListRules
  * @apiGroup FwCAT
+ * @apiDescription After posting a file to parse, use this endpoint to see the list of firewall rules.
+ * 
+ * You can also match a rule by using any key:value pair to select only the rules matching certain criteria (for instance Destination port). Regular expresions can be used.
  *
  * @apiParam {String="filter","nat"} key ID of the set of rules
  * @apiParam {Number} [per_page="ALL"] Split results in this amount of items per page. Use "ALL" for all
@@ -154,6 +172,9 @@
  * @apiParam {String} [match_value] Bring only results where match_key matches this value
  * @apiParam {Boolean} [regex] Specifies if the previous matching pair should be treated as a RegExp
  *
+ * @apiExample Example usage:
+ *     curl -i -s 'http://localhost:3000/listrules/filter?per_page=10&page=1&match_key=dstPort&match_value=389'
+ * 
  * @apiSuccess {Object[]} list List of objects matching the query.
  *
  * @apiSuccessExample Success-Response:
@@ -173,7 +194,7 @@
  * @apiErrorExample Error-Response:
  *     HTTP/1.1 400
  *     {
- *       "error": "'Key missing'"
+ *       "error": "Key missing"
  *     }
  * 
  * @apiErrorExample Error-Response:

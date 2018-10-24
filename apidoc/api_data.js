@@ -2,10 +2,11 @@ define({ "api": [
   {
     "type": "get",
     "url": "/hostdata",
-    "title": "Get firewall host information",
+    "title": "Get firewall host data",
     "version": "0.1.0",
     "name": "GetHostData",
     "group": "FwCAT",
+    "description": "<p>After posting a file to parse, use this endpoint to get firewall host information.</p>",
     "success": {
       "fields": {
         "Success 200": [
@@ -35,7 +36,7 @@ define({ "api": [
             "type": "String",
             "optional": false,
             "field": "hostname",
-            "description": "<p>Host Name.</p>"
+            "description": "<p>Host Name.o</p>"
           },
           {
             "group": "Success 200",
@@ -83,6 +84,7 @@ define({ "api": [
     "version": "0.1.0",
     "name": "GetListItems",
     "group": "FwCAT",
+    "description": "<p>After posting a file to parse, use this endpoint to list firewall properties.</p>",
     "parameter": {
       "fields": {
         "Parameter": [
@@ -120,6 +122,13 @@ define({ "api": [
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example usage:",
+        "content": "curl -i -s 'http://localhost:3000/listitems?key=routes&per_page=3&page=2'",
+        "type": "json"
+      }
+    ],
     "success": {
       "fields": {
         "Success 200": [
@@ -162,7 +171,7 @@ define({ "api": [
       "examples": [
         {
           "title": "Error-Response:",
-          "content": "HTTP/1.1 400\n{\n  \"error\": \"'Key missing'\"\n}",
+          "content": "HTTP/1.1 400\n{\n  \"error\": \"Key missing\"\n}",
           "type": "json"
         },
         {
@@ -182,6 +191,7 @@ define({ "api": [
     "version": "0.1.0",
     "name": "GetListRules",
     "group": "FwCAT",
+    "description": "<p>After posting a file to parse, use this endpoint to see the list of firewall rules.</p> <p>You can also match a rule by using any key:value pair to select only the rules matching certain criteria (for instance Destination port). Regular expresions can be used.</p>",
     "parameter": {
       "fields": {
         "Parameter": [
@@ -236,6 +246,13 @@ define({ "api": [
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example usage:",
+        "content": "curl -i -s 'http://localhost:3000/listrules/filter?per_page=10&page=1&match_key=dstPort&match_value=389'",
+        "type": "json"
+      }
+    ],
     "success": {
       "fields": {
         "Success 200": [
@@ -278,7 +295,7 @@ define({ "api": [
       "examples": [
         {
           "title": "Error-Response:",
-          "content": "HTTP/1.1 400\n{\n  \"error\": \"'Key missing'\"\n}",
+          "content": "HTTP/1.1 400\n{\n  \"error\": \"Key missing\"\n}",
           "type": "json"
         },
         {
@@ -298,6 +315,7 @@ define({ "api": [
     "version": "0.1.0",
     "name": "GetSelectItem",
     "group": "FwCAT",
+    "description": "<p>After posting a file to parse, use this endpoint get details on a given item key and id.</p>",
     "parameter": {
       "fields": {
         "Parameter": [
@@ -324,15 +342,36 @@ define({ "api": [
         ]
       }
     },
+    "examples": [
+      {
+        "title": "Example usage:",
+        "content": "curl -s 'http://localhost:3000/selectitem?key=interfaces&id=GigabitEthernet0/0'",
+        "type": "json"
+      }
+    ],
     "success": {
       "fields": {
         "Success 200": [
           {
             "group": "Success 200",
-            "type": "Object[]",
+            "type": "Object",
             "optional": false,
-            "field": "list",
+            "field": "item",
+            "description": "<p>Details on the first matching item (may be the only one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "all",
             "description": "<p>List of objects matching the query.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": true,
+            "field": "warning",
+            "description": "<p>Warns if there is something to pay attention to.</p>"
           }
         ]
       },
@@ -344,7 +383,7 @@ define({ "api": [
         },
         {
           "title": "Success-Response:",
-          "content": "{\n  \"item\": Object1,\n  \"warning\": \"Multiple items selected\",\n  \"others\": [Object2, Object3]\n}",
+          "content": "{\n  \"item\": Object1,\n  \"warning\": \"Multiple items selected\",\n  \"all\": [Object2, Object3]\n}",
           "type": "json"
         }
       ]
@@ -391,6 +430,7 @@ define({ "api": [
     "version": "0.1.0",
     "name": "PostParseCommand",
     "group": "FwCAT",
+    "description": "<p>Use this endpoint to parse a file and open the GET listeners serving the results.</p>",
     "parameter": {
       "fields": {
         "Parameter": [
@@ -421,6 +461,13 @@ define({ "api": [
         }
       ]
     },
+    "examples": [
+      {
+        "title": "Example usage:",
+        "content": "curl -H \"Content-Type: application/json\" -d '{\"cmd\":\"parseCfg\", \"cfgFile\":\"/path/to/cisco.cfg\"}' http://localhost:3000/parse",
+        "type": "json"
+      }
+    ],
     "success": {
       "examples": [
         {
