@@ -214,6 +214,8 @@ const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
+var workspaces = []
+
 // app.use(express.static(path.join(__dirname, 'static')));
 
 // Waits for POST request with the config file path --> data: {cmd:"parseCfg", cfgFile:"/path/to/file.cfg"}
@@ -223,8 +225,16 @@ app.post('/parse', function(req, res){
         cfg = parser.parseFirewall(req.body.cfgFile)
         cfg.then(config =>{
             res.writeHead(200, {'Content-Type': 'application/json'});
-            setupListeners(config)
-            res.end(JSON.stringify({status:'ready'}, null, 2));
+            if (req.body.workspace) {
+                workspaces = createWorkspace(workspaces)
+                var ws = workspaces[workspaces.length - 1]
+                setupListeners(config, ws)
+                res.end(JSON.stringify({status:'ready', workspace:ws}, null, 2));
+            }
+            else {
+                setupListeners(config)
+                res.end(JSON.stringify({status:'ready'}, null, 2));
+            }
         }).catch(error => {
             res.writeHead(500, {'Content-Type': 'application/json'})
             res.end(JSON.stringify({error:error.message}));
@@ -237,12 +247,14 @@ app.post('/parse', function(req, res){
 
 
 // Sets up get listeners once the config is parsed
-function setupListeners(configJSON){
+function setupListeners(configJSON, WORKSPACE){
     /**
      *  Gets information regarding a specific object
      *  URL: /selectobject?id=objectid&key=[objects|objectgroups|interfaces|users]
      */
-    app.get('/selectitem', function(req, res){
+    var route = (WORKSPACE == undefined) ? '' : '/' + WORKSPACE.id
+
+    app.get(route + '/selectitem', function(req, res){
         if (req.query.id === undefined || req.query.key === undefined) {
             res.writeHead(400, {'Content-Type': 'application/json'})
             res.end(JSON.stringify({error:'ID or key missing'}));
@@ -267,7 +279,7 @@ function setupListeners(configJSON){
      * 
      *  key can take [objects|objectgroups|routes|interfaces|users|notparsed]
      */
-    app.get('/listitems', function(req, res){
+    app.get(route + '/listitems', function(req, res){
         if (req.query.key === undefined) {
             res.writeHead(400, {'Content-Type': 'application/json'})
             res.end(JSON.stringify({error:'Key missing'}));
@@ -294,7 +306,7 @@ function setupListeners(configJSON){
         }
     });
 
-    app.get('/listrules/:key', function(req, res){
+    app.get(route + '/listrules/:key', function(req, res){
         if (req.params.key === undefined) {
             res.writeHead(400, {'Content-Type': 'application/json'})
             res.end(JSON.stringify({error:'Key missing'}));
@@ -325,7 +337,7 @@ function setupListeners(configJSON){
         }
     });
 
-    app.get('/hostdata', function(req, res){
+    app.get(route + '/hostdata', function(req, res){
         log.silly('GET /hostdata')
         if (!('host' in configJSON) || !('fwType' in configJSON.host)){
             res.writeHead(500, {'Content-Type': 'application/json'})
@@ -336,6 +348,15 @@ function setupListeners(configJSON){
             res.end(JSON.stringify({host:configJSON.host}, null, 2));
         }
     });
+}
+
+function createWorkspace(WORKSPACES){
+    while (true){
+        var rnd = [...Array(15)].map(i=>(~~(Math.random()*36)).toString(36)).join('')
+        if (!(rnd in WORKSPACES.map(o => {return o.id}))) break
+    }
+    WORKSPACES.push({id:rnd})
+    return WORKSPACES
 }
 
 
