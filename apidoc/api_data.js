@@ -1,11 +1,110 @@
 define({ "api": [
   {
+    "type": "post",
+    "url": "/parse",
+    "title": "Parse file",
+    "version": "0.1.0",
+    "name": "PostParseCommand",
+    "group": "FwCAT",
+    "description": "<p>Use this endpoint to parse a file and open the GET listeners serving the results.</p>",
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "String",
+            "allowedValues": [
+              "\"parseCfg\""
+            ],
+            "optional": false,
+            "field": "cmd",
+            "description": "<p>Command to send to endpoint</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "cfgFile",
+            "description": "<p>Full path to the configuration file to parse</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "Boolean",
+            "optional": true,
+            "field": "workspace",
+            "description": "<p>Workspace mode: Specify if the parsed data should be part of a separate Workspace. If using the workspace mode, all the endpoints in the <a href=\"#api-Query\">Query</a> section are available under <code>/{workspace.id}/</code>, value that is generated and returned from this POST.</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Request-Example:",
+          "content": "{     \"cmd\": \"parseCfg\",\n  \"cfgFile\": \"/path/to/cisco.cfg\" }",
+          "type": "json"
+        }
+      ]
+    },
+    "examples": [
+      {
+        "title": "Example usage:",
+        "content": "curl -H \"Content-Type: application/json\" -d '{\"cmd\":\"parseCfg\", \"cfgFile\":\"/path/to/cisco.cfg\"}' http://localhost:3000/parse\n# Or if you want to make use of the Workspaces feature:\ncurl -H \"Content-Type: application/json\" -d '{\"cmd\":\"parseCfg\", \"cfgFile\":\"/path/to/cisco.cfg\", workspace:true}' http://localhost:3000/parse",
+        "type": "json"
+      }
+    ],
+    "success": {
+      "examples": [
+        {
+          "title": "Success-Response:",
+          "content": "HTTP/1.1 200 OK\n{\n  \"status\": \"ready\"\n}",
+          "type": "json"
+        },
+        {
+          "title": "Success-Response:",
+          "content": "HTTP/1.1 200 OK\n{\n  \"status\": \"ready\"\n  \"workspace\": {\n    \"id\": \"r5j6e2dj03gzexo\",\n    \"configFile\": \"/path/to/cisco.cfg\"\n  }\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "error": {
+      "fields": {
+        "Error 4xx": [
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "InvalidCommand",
+            "description": "<p>cmd parameter is not valid</p>"
+          },
+          {
+            "group": "Error 4xx",
+            "optional": false,
+            "field": "RepeatedFile",
+            "description": "<p>Config is already parsed in a workspace</p>"
+          }
+        ]
+      },
+      "examples": [
+        {
+          "title": "Error-Response:",
+          "content": "HTTP/1.1 418\n{\n  \"error\": \"Command is not valid\"\n}",
+          "type": "json"
+        },
+        {
+          "title": "Error-Response:",
+          "content": "HTTP/1.1 400\n{\n  \"error\":\"File is already parsed in a workspace\"\n}",
+          "type": "json"
+        }
+      ]
+    },
+    "filename": "./api.js",
+    "groupTitle": "FwCAT"
+  },
+  {
     "type": "get",
     "url": "/hostdata",
     "title": "Get firewall host data",
     "version": "0.1.0",
     "name": "GetHostData",
-    "group": "FwCAT",
+    "group": "Query",
     "description": "<p>After posting a file to parse, use this endpoint to get firewall host information.</p>",
     "success": {
       "fields": {
@@ -75,7 +174,7 @@ define({ "api": [
       ]
     },
     "filename": "./api.js",
-    "groupTitle": "FwCAT"
+    "groupTitle": "Query"
   },
   {
     "type": "get",
@@ -83,7 +182,7 @@ define({ "api": [
     "title": "List firewall properties",
     "version": "0.1.0",
     "name": "GetListItems",
-    "group": "FwCAT",
+    "group": "Query",
     "description": "<p>After posting a file to parse, use this endpoint to list firewall properties.</p>",
     "parameter": {
       "fields": {
@@ -125,7 +224,7 @@ define({ "api": [
     "examples": [
       {
         "title": "Example usage:",
-        "content": "curl -i -s 'http://localhost:3000/listitems?key=routes&per_page=3&page=2'",
+        "content": "curl -i -s 'http://localhost:3000/listitems?key=routes&per_page=3&page=2'\n# Or if you want to make use of the Workspaces feature (example workspace.id = \"r5j6e2dj03gzexo\"):\ncurl -i -s 'http://localhost:3000/r5j6e2dj03gzexo/listitems?key=routes&per_page=3&page=2'",
         "type": "json"
       }
     ],
@@ -182,7 +281,7 @@ define({ "api": [
       ]
     },
     "filename": "./api.js",
-    "groupTitle": "FwCAT"
+    "groupTitle": "Query"
   },
   {
     "type": "get",
@@ -190,7 +289,7 @@ define({ "api": [
     "title": "List firewall rules",
     "version": "0.1.0",
     "name": "GetListRules",
-    "group": "FwCAT",
+    "group": "Query",
     "description": "<p>After posting a file to parse, use this endpoint to see the list of firewall rules.</p> <p>You can also match a rule by using any key:value pair to select only the rules matching certain criteria (for instance Destination port). Regular expresions can be used.</p>",
     "parameter": {
       "fields": {
@@ -306,15 +405,15 @@ define({ "api": [
       ]
     },
     "filename": "./api.js",
-    "groupTitle": "FwCAT"
+    "groupTitle": "Query"
   },
   {
     "type": "get",
     "url": "/selectitem",
-    "title": "Get information on an item",
+    "title": "Get item information",
     "version": "0.1.0",
     "name": "GetSelectItem",
-    "group": "FwCAT",
+    "group": "Query",
     "description": "<p>After posting a file to parse, use this endpoint get details on a given item key and id.</p>",
     "parameter": {
       "fields": {
@@ -421,82 +520,26 @@ define({ "api": [
       ]
     },
     "filename": "./api.js",
-    "groupTitle": "FwCAT"
+    "groupTitle": "Query"
   },
   {
-    "type": "post",
-    "url": "/parse",
-    "title": "Post command to parser",
+    "type": "get",
+    "url": "/workspaces",
+    "title": "List workspaces",
     "version": "0.1.0",
-    "name": "PostParseCommand",
-    "group": "FwCAT",
-    "description": "<p>Use this endpoint to parse a file and open the GET listeners serving the results.</p>",
-    "parameter": {
-      "fields": {
-        "Parameter": [
-          {
-            "group": "Parameter",
-            "type": "String",
-            "allowedValues": [
-              "\"parseCfg\""
-            ],
-            "optional": false,
-            "field": "cmd",
-            "description": "<p>Command to send to endpoint</p>"
-          },
-          {
-            "group": "Parameter",
-            "type": "String",
-            "optional": false,
-            "field": "cfgFile",
-            "description": "<p>Full path to the configuration file to parse</p>"
-          }
-        ]
-      },
-      "examples": [
-        {
-          "title": "Request-Example:",
-          "content": "{     \"cmd\": \"parseCfg\",\n  \"cfgFile\": \"/path/to/cisco.cfg\" }",
-          "type": "json"
-        }
-      ]
-    },
-    "examples": [
-      {
-        "title": "Example usage:",
-        "content": "curl -H \"Content-Type: application/json\" -d '{\"cmd\":\"parseCfg\", \"cfgFile\":\"/path/to/cisco.cfg\"}' http://localhost:3000/parse",
-        "type": "json"
-      }
-    ],
+    "name": "GetWorkspaces",
+    "group": "Workspaces",
+    "description": "<p>Workspaces are generated when sending a parsing command with the 'workspace' flag on (See <a href=\"#api-FwCAT-PostParseCommand\">/parse</a>).</p> <p>The parser will return an object containing <code>{status:&quot;ready&quot;, workspace:{id:&quot;pdch0f7udfsnz0y&quot;, configFile:&quot;/path/to/cisco2.cfg&quot;}}</code>.</p> <p>Using the ID of the workspace obtained, you can query all the endpoints described in the <a href=\"#api-Query\">Query</a> section, prepending the workspace ID, for instance: <code>/pdch0f7udfsnz0y/hostdata</code>.</p> <p>By consuming this endpoint you can get the current list of active workspaces.</p>",
     "success": {
       "examples": [
         {
           "title": "Success-Response:",
-          "content": "HTTP/1.1 200 OK\n{\n  \"status\": \"ready\"\n}",
-          "type": "json"
-        }
-      ]
-    },
-    "error": {
-      "fields": {
-        "Error 4xx": [
-          {
-            "group": "Error 4xx",
-            "optional": false,
-            "field": "InvalidCommand",
-            "description": "<p>cmd parameter is not valid</p>"
-          }
-        ]
-      },
-      "examples": [
-        {
-          "title": "Error-Response:",
-          "content": "HTTP/1.1 418\n{\n  \"error\": \"Command is not valid\"\n}",
+          "content": "[\n  {\n    \"id\": \"r5j6e2dj03gzexo\",\n    \"configFile\": \"/path/to/cisco.cfg\"\n  },\n  {\n    \"id\": \"pdch0f7udfsnz0y\",\n    \"configFile\": \"/path/to/cisco2.cfg\"\n  }\n]",
           "type": "json"
         }
       ]
     },
     "filename": "./api.js",
-    "groupTitle": "FwCAT"
+    "groupTitle": "Workspaces"
   }
 ] });
