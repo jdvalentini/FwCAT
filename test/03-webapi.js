@@ -3,7 +3,7 @@ const api = require('../api.js')
 const request = require('supertest');
 const assert = require('assert');
 
-describe('WEB API: Parses config file upon proper requests', function () {
+describe('WEB API: config file parsing upon proper requests', function () {
     var server = require('../api.js');
 
     it('Returns 418 if POST /parse command is not understood', function testSlash(done) {
@@ -94,4 +94,28 @@ describe('WEB API: Parses config file upon proper requests', function () {
     });
     
     server.close();
+});
+
+describe('WEB API: Workspace separation', function () {
+    var server = require('../api.js');
+
+    it('Handles auto-generated workspaces', function() {
+        request(server)
+        .post('/parse')
+        .type('form')
+        .send({cmd:"parseCfg", cfgFile: __dirname + "/cfg-cisco-asa98-01.cfg", workspace:true})
+        .expect(200)
+        .expect("Content-type",/json/)
+        .expect((res) => {
+            if (!('workspace' in res.body)) throw new Error('Missing workspace data')
+            if (res.body.workspace.configFile !== __dirname + "/cfg-cisco-asa98-01.cfg") throw new Error('Errors in workspace response')
+        })
+        .end(function (err, res) {
+            if (err) done(err)
+            else {
+                workspace.push(res.body.workspace)
+                done();
+            }
+        });        
+    });
 });
