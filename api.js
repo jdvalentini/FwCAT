@@ -6,7 +6,7 @@
  */
 
 /**
- * @api {post} /parse Post command to parser
+ * @api {post} /parse Parse file
  * @apiVersion 0.1.0
  * @apiName PostParseCommand
  * @apiGroup FwCAT
@@ -14,6 +14,7 @@
  * 
  * @apiParam {String="parseCfg"} cmd Command to send to endpoint
  * @apiParam {String} cfgFile Full path to the configuration file to parse
+ * @apiParam {Boolean} [workspace] Workspace mode: Specify if the parsed data should be part of a separate Workspace. If using the workspace mode, all the endpoints in the <a href="#api-Query">Query</a> section are available under <code>/{workspace.id}/</code>, value that is generated and returned from this POST.
  * 
  * @apiParamExample {json} Request-Example:
  *     {     "cmd": "parseCfg",
@@ -21,19 +22,36 @@
  * 
  * @apiExample Example usage:
  *     curl -H "Content-Type: application/json" -d '{"cmd":"parseCfg", "cfgFile":"/path/to/cisco.cfg"}' http://localhost:3000/parse
+ *     # Or if you want to make use of the Workspaces feature:
+ *     curl -H "Content-Type: application/json" -d '{"cmd":"parseCfg", "cfgFile":"/path/to/cisco.cfg", workspace:true}' http://localhost:3000/parse
  *
  * @apiSuccessExample Success-Response:
  *     HTTP/1.1 200 OK
  *     {
  *       "status": "ready"
  *     }
+ * @apiSuccessExample Success-Response:
+ *     HTTP/1.1 200 OK
+ *     {
+ *       "status": "ready"
+ *       "workspace": {
+ *         "id": "r5j6e2dj03gzexo",
+ *         "configFile": "/path/to/cisco.cfg"
+ *       }
+ *     }
  *
  * @apiError (Error 4xx) InvalidCommand cmd parameter is not valid
+ * @apiError (Error 4xx) RepeatedFile Config is already parsed in a workspace
  *
  * @apiErrorExample Error-Response:
  *     HTTP/1.1 418
  *     {
  *       "error": "Command is not valid"
+ *     }
+ * @apiErrorExample Error-Response:
+ *     HTTP/1.1 400
+ *     {
+ *       "error":"File is already parsed in a workspace"
  *     }
  */
 
@@ -41,7 +59,7 @@
  * @api {get} /hostdata Get firewall host data
  * @apiVersion 0.1.0
  * @apiName GetHostData
- * @apiGroup FwCAT
+ * @apiGroup Query
  * @apiDescription After posting a file to parse, use this endpoint to get firewall host information.
  * 
  * @apiSuccess {String} fwType Firewall parsing syntax.
@@ -71,7 +89,7 @@
  * @api {get} /listitems List firewall properties
  * @apiVersion 0.1.0
  * @apiName GetListItems
- * @apiGroup FwCAT
+ * @apiGroup Query
  * @apiDescription After posting a file to parse, use this endpoint to list firewall properties.
  *
  * @apiParam {String="objects","objectgroups","routes","interfaces","users","notparsed"} key Config property to retrieve
@@ -80,6 +98,8 @@
  *
  * @apiExample Example usage:
  *     curl -i -s 'http://localhost:3000/listitems?key=routes&per_page=3&page=2'
+ *     # Or if you want to make use of the Workspaces feature (example workspace.id = "r5j6e2dj03gzexo"):
+ *     curl -i -s 'http://localhost:3000/r5j6e2dj03gzexo/listitems?key=routes&per_page=3&page=2'
  * 
  * @apiSuccess {Object[]} list List of objects for the requested property.
  *
@@ -111,10 +131,10 @@
  */
 
 /**
- * @api {get} /selectitem Get information on an item
+ * @api {get} /selectitem Get item information
  * @apiVersion 0.1.0
  * @apiName GetSelectItem
- * @apiGroup FwCAT
+ * @apiGroup Query
  * @apiDescription After posting a file to parse, use this endpoint get details on a given item key and id.
  *
  * @apiParam {String="objects","objectgroups","interfaces","users"} key Config property to retrieve
@@ -160,7 +180,7 @@
  * @api {get} /listrules/:key List firewall rules
  * @apiVersion 0.1.0
  * @apiName GetListRules
- * @apiGroup FwCAT
+ * @apiGroup Query
  * @apiDescription After posting a file to parse, use this endpoint to see the list of firewall rules.
  * 
  * You can also match a rule by using any key:value pair to select only the rules matching certain criteria (for instance Destination port). Regular expresions can be used.
@@ -204,6 +224,31 @@
  *     }
  */
 
+/**
+ * @api {get} /workspaces List workspaces
+ * @apiVersion 0.1.0
+ * @apiName GetWorkspaces
+ * @apiGroup Workspaces
+ * @apiDescription Workspaces are generated when sending a parsing command with the 'workspace' flag on (See <a href="#api-FwCAT-PostParseCommand">/parse</a>).
+ * 
+ * The parser will return an object containing <code>{status:"ready", workspace:{id:"pdch0f7udfsnz0y", configFile:"/path/to/cisco2.cfg"}}</code>. 
+ * 
+ * Using the ID of the workspace obtained, you can query all the endpoints described in the <a href="#api-Query">Query</a> section, prepending the workspace ID, for instance: <code>/pdch0f7udfsnz0y/hostdata</code>.
+ * 
+ * By consuming this endpoint you can get the current list of active workspaces.
+ * 
+ * @apiSuccessExample Success-Response:
+ *     [
+ *       {
+ *         "id": "r5j6e2dj03gzexo",
+ *         "configFile": "/path/to/cisco.cfg"
+ *       },
+ *       {
+ *         "id": "pdch0f7udfsnz0y",
+ *         "configFile": "/path/to/cisco2.cfg"
+ *       }
+ *     ]
+ */
 
 const parser = require(__dirname + '/parser.js')
 const log = require('electron-log')
@@ -224,15 +269,22 @@ app.post('/parse', function(req, res){
     if (req.body.cmd == 'parseCfg'){
         cfg = parser.parseFirewall(req.body.cfgFile)
         cfg.then(config =>{
-            res.writeHead(200, {'Content-Type': 'application/json'});
             if (req.body.workspace) {
-                workspaces = createWorkspace(workspaces)
-                var ws = workspaces[workspaces.length - 1]
-                setupListeners(config, ws)
-                res.end(JSON.stringify({status:'ready', workspace:ws}, null, 2));
+                if (workspaces.filter(o => o.configFile == req.body.cfgFile).length > 0) {
+                    res.writeHead(400, {'Content-Type': 'application/json'});
+                    res.end(JSON.stringify({error:'File is already parsed in a workspace'}));
+                } else {
+                    workspaces = createWorkspace(workspaces)
+                    workspaces[workspaces.length - 1].configFile = req.body.cfgFile
+                    var ws = workspaces[workspaces.length - 1]
+                    setupListeners(config, ws)
+                    res.writeHead(200, {'Content-Type': 'application/json'});
+                    res.end(JSON.stringify({status:'ready', workspace:ws}, null, 2));
+                }
             }
             else {
                 setupListeners(config)
+                res.writeHead(200, {'Content-Type': 'application/json'});
                 res.end(JSON.stringify({status:'ready'}, null, 2));
             }
         }).catch(error => {
@@ -350,10 +402,16 @@ function setupListeners(configJSON, WORKSPACE){
     });
 }
 
+app.get('/workspaces', function(req,res){
+    log.silly('GET /workspaces')
+    res.writeHead(200, {'Content-Type': 'application/json'})
+    res.end(JSON.stringify(workspaces, null, 2));
+})
+
 function createWorkspace(WORKSPACES){
     while (true){
         var rnd = [...Array(15)].map(i=>(~~(Math.random()*36)).toString(36)).join('')
-        if (!(rnd in WORKSPACES.map(o => {return o.id}))) break
+        if (WORKSPACES.filter(o => o.id == rnd).length == 0) break
     }
     WORKSPACES.push({id:rnd})
     return WORKSPACES
