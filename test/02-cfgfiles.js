@@ -75,8 +75,8 @@ describe('Parse configuration file: Cisco ASA 9.8', () => {
     it('Understands NAT rules', () => {
         parser.parseFirewall(configFile).then(data =>{
             assert.equal(data.rules.nat.length, 1)
-            assert.equal(data.rules.nat[0].realInterface, 'ETH0')
-            assert.equal(data.rules.nat[0].mappedInterface, 'ETH1')
+            assert.equal(data.rules.nat[0].srcInterface, 'ETH0')
+            assert.equal(data.rules.nat[0].dstInterface, 'ETH1')
         })
     })
 

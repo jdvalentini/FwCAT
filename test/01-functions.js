@@ -180,8 +180,8 @@ describe('Cisco Module: typedParseLine function',() => {
 
     it('Parses NAT rules', () => {
         var result = cisco.parseNAT('nat (New-Inside,New-Outside) source static 192.168.0.1 8.8.0.1', 0)
-        assert.equal(result.realInterface,'New-Inside')
-        assert.equal(result.mappedInterface,'New-Outside')
+        assert.equal(result.srcInterface,'New-Inside')
+        assert.equal(result.dstInterface,'New-Outside')
     })
 })
 
