@@ -90,8 +90,6 @@ describe('WEB API: Parses config file upon proper requests', function () {
     it('Returns 404 if the requested route is inexistent', function() {
         return request(server)
         .get('/inexistent')
-        .set('Accept','application/json')
-        .expect("Content-type",/json/)
         .expect(404)
     });
     
