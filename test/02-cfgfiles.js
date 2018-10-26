@@ -77,6 +77,19 @@ describe('Parse configuration file: Cisco ASA 9.8', () => {
             assert.equal(data.rules.nat.length, 1)
             assert.equal(data.rules.nat[0].srcInterface, 'ETH0')
             assert.equal(data.rules.nat[0].dstInterface, 'ETH1')
+            assert.equal(data.rules.nat[0].source.real,'192.168.10.1')
+            assert.equal(data.rules.nat[0].source.translated,'10.0.0.1')
+            assert.equal(data.rules.nat[0].service.real,'HTTP')
+            assert.equal(data.rules.nat[0].service.translated,'HTTP')
+
+            var objnat = data.objects.filter(OBJECT => {
+                return OBJECT.id == 'OBJNETWORK'
+            })
+            assert.equal(objnat[0].nat.mapped.translated, '1.1.0.1')
+            assert.equal(objnat[0].nat.mapped.syntax, 'IP')
+            assert.equal(objnat[0].nat.service.protocol, 'tcp')
+            assert.equal(objnat[0].nat.service.real, '8080')
+            assert.equal(objnat[0].nat.service.translated, '8081')
         })
     })
 
